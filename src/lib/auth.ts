@@ -7,6 +7,7 @@
 import { CognitoJwtVerifier } from "aws-jwt-verify";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { roleFromGroups, type Role } from "./roles";
 
 export const SESSION_COOKIE = "tb_session";
 
@@ -24,6 +25,8 @@ export interface User {
   email: string;
   name: string;
   org: string;
+  /** From the Cognito group. null = signed in but not given a role yet (no access). */
+  role: Role | null;
 }
 
 let verifier: ReturnType<typeof CognitoJwtVerifier.create<{ userPoolId: string; tokenUse: "id"; clientId: string }>> | null = null;
@@ -41,7 +44,7 @@ export async function userFromToken(token: string | undefined): Promise<User | n
     const org = typeof p["custom:org"] === "string" && p["custom:org"] ? p["custom:org"] : `${PERSONAL_ORG_PREFIX}${p.sub}`;
     const email = typeof p.email === "string" ? p.email : "";
     const name = typeof p.name === "string" && p.name ? p.name : email.split("@")[0];
-    return { email, name, org };
+    return { email, name, org, role: roleFromGroups(p["cognito:groups"]) };
   } catch {
     return null;
   }
@@ -51,6 +54,13 @@ export async function userFromToken(token: string | undefined): Promise<User | n
 export async function requireUser(): Promise<User | NextResponse> {
   const user = await userFromToken((await cookies()).get(SESSION_COOKIE)?.value);
   return user ?? NextResponse.json({ error: "Not signed in" }, { status: 401 });
+}
+
+/** For API routes: the user if they hold one of `roles`, else 401 (not signed in) or 403 (wrong role). */
+export async function requireRole(...roles: Role[]): Promise<User | NextResponse> {
+  const u = await requireUser();
+  if (u instanceof NextResponse) return u;
+  return u.role && roles.includes(u.role) ? u : NextResponse.json({ error: "Your role cannot do this" }, { status: 403 });
 }
 
 /** The app's own address as the browser sees it (Amplify sits behind a proxy). */
