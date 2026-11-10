@@ -3,13 +3,44 @@
 // include, preview exactly what the agent will read, then download.
 
 import { useState } from "react";
-import type { WorkMap } from "@/lib/types";
+import type { WorkflowRecord, WorkMap } from "@/lib/types";
 import Dialog, { btnIndigo, btnIndigoOutline } from "@/features/apprentice/Dialog";
-import { downloadText, toAgentJson, toAgentMarkdown, type ExportOptions } from "./exportAgent";
+import { DEFAULT_EXPORT, downloadText, toAgentJson, toAgentMarkdown, type ExportOptions } from "./exportAgent";
 
-export default function ExportDialog({ map, onClose }: { map: WorkMap; onClose: () => void }) {
+export default function ExportDialog({
+  map,
+  onClose,
+  workflowId,
+  onBuilt,
+}: {
+  map: WorkMap;
+  onClose: () => void;
+  /** Set for a saved workflow: lets the dialog add tools and data by building the process map. */
+  workflowId?: string;
+  onBuilt?: (record: WorkflowRecord) => void;
+}) {
   const [format, setFormat] = useState<"md" | "json">("md");
-  const [opts, setOpts] = useState<ExportOptions>({ quotes: true, guardrails: true, screenMoments: false });
+  const [opts, setOpts] = useState<ExportOptions>(DEFAULT_EXPORT);
+  const [building, setBuilding] = useState(false);
+  const [buildError, setBuildError] = useState<string | null>(null);
+  const built = !!map.processBuiltAt;
+
+  async function build() {
+    if (!workflowId) return;
+    setBuilding(true);
+    setBuildError(null);
+    try {
+      const r = await fetch("/api/processmap", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: workflowId }) });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(String(data.error ?? ""));
+      onBuilt?.(data as WorkflowRecord);
+    } catch (e) {
+      const m = e instanceof Error ? e.message : "";
+      setBuildError(/took longer|503|429|high demand/i.test(m) ? "The AI model is busy right now. Try again in a minute." : "Couldn't add them. Try again.");
+    } finally {
+      setBuilding(false);
+    }
+  }
   const text = format === "md" ? toAgentMarkdown(map, opts) : toAgentJson(map, opts);
   const file = format === "md" ? "apprentice-rules.md" : "apprentice-rules.json";
 
@@ -53,7 +84,17 @@ export default function ExportDialog({ map, onClose }: { map: WorkMap; onClose: 
           <div className="pt-2 text-[13px] font-bold uppercase tracking-wide text-[#333]">Include</div>
           {include("quotes", "Expert quotes")}
           {include("guardrails", "Guardrails")}
-          {include("screenMoments", "Screen moments (times)")}
+          {include("process", "Tools, data and step links")}
+          {include("screenMoments", "Timing of each step")}
+          {opts.process && !built && workflowId && (
+            <div className="rounded-sm border border-[#f0d58a] bg-warn-soft p-3 text-[13.5px] text-[#5c4400]">
+              Tools, the data each step needs and produces, and how steps connect aren&apos;t worked out yet.
+              <button onClick={build} disabled={building} className="mt-2 block h-9 rounded-sm bg-indigo px-3 text-[14px] text-white hover:bg-indigo-dark disabled:opacity-60">
+                {building ? "Working it out… (about 15 s)" : "Add them now"}
+              </button>
+              {buildError && <span className="mt-1 block text-err">{buildError}</span>}
+            </div>
+          )}
           <p className="text-[13px] text-[#444]">Names and card numbers are removed from the export.</p>
         </div>
         <div className="min-w-0 p-5">

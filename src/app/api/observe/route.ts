@@ -40,6 +40,8 @@ Worth asking (best first):
 Not worth asking: how the software works or how they moved around it (which menu, button, gallery or screen they used, whether a field fills itself in, whether they always use a feature: that's the tool, not their judgment), routine form-filling (amounts, names, dates), anything the screen already shows, anything already answered, anything you could guess from common sense. Never repeat an asked question or ask two things at once.
 At most 15 words, friendly, about what just happened, e.g. "You added a screenshot to this one but not the first. What's it for?"
 If you can't tell what the expert just did, don't guess: action null, question null.
+Stay on the TASK BEING TAUGHT. Screens that are not part of it are not steps: chat or social apps, personal browsing, email or documents unrelated to the task, the desktop, system settings, and Torchbearer's own pages (its vault, recorder, Teaching or Training tabs). For those: action null, no new step, no question. If the expert comes back to the task, carry on.
+Secrets: never write a password, login, access code or other credential into an action or a step. If the expert looks one up, write the step as "Look up the login for <system>" with no value, and never ask about its value.
 Screenshots can be several seconds apart, so steps may have happened in between that you did not see (for example a gallery or dialog that opened and closed). Never assume a step was skipped or done another way just because you didn't see it, and never ask about it.
 
 Never include personal data (emails, phone, card or bank numbers).`;
@@ -57,6 +59,7 @@ const toPart = (dataUrl: string) => ({
 
 interface Body {
   mode?: "observe" | "integrate";
+  task?: string; // the workflow name the expert gave
   frame?: string;
   previous?: string | null;
   workflow: ObservedStep[];
@@ -102,7 +105,7 @@ export async function POST(req: Request) {
   }
 
   const context = redact(
-    `NOW: ${now}\n\nACTION LOG:\n${(body.actions ?? []).map((a) => `${a.time} ${a.text}`).join("\n") || "(nothing yet)"}\n\nWORKFLOW SO FAR:\n${JSON.stringify(workflow)}\n\nALREADY ASKED (do not repeat):\n${asked.join("\n") || "(none)"}\n\nANSWERS SO FAR:\n${qa.map((x) => `Q: ${x.q}\nA: ${x.a}`).join("\n") || "(none)"}`,
+    `TASK BEING TAUGHT: ${body.task || "(not named)"}\nNOW: ${now}\n\nACTION LOG:\n${(body.actions ?? []).map((a) => `${a.time} ${a.text}`).join("\n") || "(nothing yet)"}\n\nWORKFLOW SO FAR:\n${JSON.stringify(workflow)}\n\nALREADY ASKED (do not repeat):\n${asked.join("\n") || "(none)"}\n\nANSWERS SO FAR:\n${qa.map((x) => `Q: ${x.q}\nA: ${x.a}`).join("\n") || "(none)"}`,
   );
   const parts = [
     { text: context },
