@@ -1,10 +1,16 @@
-<h1 align="center">🔥 TorchBearer</h1>
+<p align="center"><img src="docs/images/torch.svg" alt="TorchBearer torch logo" width="56"></p>
+<h1 align="center">TorchBearer</h1>
 <p align="center"><b>The AI Apprentice.</b> It watches experts work, asks why at the right moment,<br>and teaches what they know to the next generation.</p>
 
 <p align="center">
   <a href="https://main.d3dd61qwuyekg8.amplifyapp.com">Website</a> ·
   <a href="https://aws.d32tnuo1sla34.amplifyapp.com/capture">Live app</a> (invite-only) ·
   <a href="docs/aws-deployment.md">Architecture &amp; decisions</a>
+</p>
+
+<p align="center">
+  <img src="docs/images/training.png" alt="TorchBearer coaching a new hire: it flags a 48 EUR meal saved without a receipt, because the expert's rule says meals over 35 EUR need one, and tracks which of the expert's steps the new hire has learned" width="860">
+  <br><sub>Training: TorchBearer catches a meal over 35&nbsp;€ saved without a receipt (the expert's rule) and tracks each step the new hire has learned.</sub>
 </p>
 
 ---
