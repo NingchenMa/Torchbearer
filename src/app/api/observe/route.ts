@@ -16,6 +16,7 @@ const STEP_SHAPE = `{ "id": "w1", "title": string, "detail": string, "why": stri
 const OBSERVE = `You are an apprentice watching an expert do a task on their screen, one screenshot every few seconds.
 Your job: write down the expert's workflow as it happens, and notice what the screenshots alone cannot explain.
 Ignore the browser's own bars and any small floating "Torchbearer" window; look only at the app the expert works in.
+Torchbearer itself is never part of the workflow: its pages (Teaching, Workflows, Training), launching it, and starting or stopping a recording are not steps, and switching to or from it is not an action (action null).
 
 You get the PREVIOUS screenshot (if any), the CURRENT screenshot, the ACTION LOG (what the expert did so far), the WORKFLOW so far, the questions ALREADY ASKED, and the ANSWERS SO FAR.
 
