@@ -30,6 +30,8 @@ export default function MappingPage() {
   const [library, setLibrary] = useState<WorkflowSummary[]>([]);
   const [record, setRecord] = useState<WorkflowRecord | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0); // bumped by Retry to load again
   const [saveState, setSaveState] = useState<"saved" | "saving" | "error">("saved");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -38,16 +40,24 @@ export default function MappingPage() {
     listWorkflows().then(async (list) => {
       if (!live) return;
       setLibrary(list);
-      const loaded = (await getWorkflow(idParam ?? list[0]?.id)) ?? exampleWorkflow();
-      if (live) {
-        setRecord(loaded);
-        setLoading(false);
-      }
+      const wanted = idParam ?? list[0]?.id;
+      const loaded = await getWorkflow(wanted);
+      if (!live) return;
+      // A real workflow that didn't load is an error, never a silent switch to the prepared example
+      // (that looks like the recording vanished). The example only shows when nothing is recorded yet.
+      if (loaded || !wanted) setRecord(loaded ?? exampleWorkflow());
+      setLoadFailed(!loaded && !!wanted);
+      setLoading(false);
     });
     return () => {
       live = false;
     };
-  }, [idParam]);
+  }, [idParam, attempt]);
+
+  function retryLoad() {
+    setLoading(true);
+    setAttempt((n) => n + 1);
+  }
 
   const wf = record ?? exampleWorkflow();
   const map = wf.map;
@@ -117,6 +127,22 @@ export default function MappingPage() {
 
   if (loading) {
     return <div className="grid min-h-full place-items-center bg-[#f6f8fc] text-[15px] text-[#667085]">Loading the workflow from the database…</div>;
+  }
+  if (loadFailed) {
+    return (
+      <div className="grid min-h-full place-items-center bg-[#f6f8fc] p-6 text-center">
+        <div className="max-w-md">
+          <div className="text-[22px] font-light text-[#1f2d3d]">Couldn&apos;t load this workflow</div>
+          <p className="mt-2 text-[15px] text-[#667085]">
+            The connection may have dropped or your sign-in may have ended. Nothing was deleted. Try again, or open the workflow from the vault.
+          </p>
+          <div className="mt-5 flex justify-center gap-3">
+            <button onClick={retryLoad} className="h-11 rounded-sm bg-indigo px-5 text-[15px] text-white hover:bg-indigo-dark">Try again</button>
+            <Link href="/vault" className="inline-flex h-11 items-center rounded-sm border border-indigo bg-white px-5 text-[15px] text-indigo hover:bg-indigo-soft">← Vault</Link>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
