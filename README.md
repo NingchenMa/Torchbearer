@@ -1,6 +1,4 @@
-<p align="center"><img src="docs/images/torch.svg" alt="TorchBearer torch logo" width="56"></p>
-<h1 align="center">TorchBearer</h1>
-<p align="center"><b>The AI Apprentice.</b> It watches experts work, asks why at the right moment,<br>and teaches what they know to the next generation.</p>
+<a href="https://main.d3dd61qwuyekg8.amplifyapp.com"><img src="docs/images/banner.jpg" alt="TorchBearer. We pass on the torch. The AI Apprentice watches experts work, asks why at the right moment, and teaches what they know to the next generation." width="100%"></a>
 
 <p align="center">
   <a href="https://main.d3dd61qwuyekg8.amplifyapp.com">Website</a> ·
