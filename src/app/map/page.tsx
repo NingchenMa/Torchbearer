@@ -193,7 +193,7 @@ export default function MappingPage() {
               </button>
               {approved && (
                 <Link href={`/teach?id=${wf.id}`} className="inline-flex h-11 items-center rounded-sm bg-indigo px-5 text-[15px] text-white shadow-sm hover:bg-indigo-dark">
-                  Go to Teaching →
+                  Go to Training →
                 </Link>
               )}
             </div>

@@ -63,7 +63,7 @@ export default function ReviewPage() {
       <div className="mx-auto max-w-6xl px-6 py-6">
         {items.length === 0 && (
           <div className="rounded-md border border-line bg-white p-8 text-center text-[15px] text-[#475467]">
-            Nothing under review yet. Items appear here when the new hire practises in <Link href="/teach" className="text-brand hover:underline">Teaching</Link>.
+            Nothing under review yet. Items appear here when the new hire practises in <Link href="/teach" className="text-brand hover:underline">Training</Link>.
           </div>
         )}
         <ol className="flex flex-col gap-4">
