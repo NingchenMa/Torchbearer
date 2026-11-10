@@ -96,4 +96,4 @@ docs/               architecture decisions, agent prompts, data formats
 
 Pre-pilot. Sign-in (Amazon Cognito) and per-company data separation are in. Next up: Aurora PostgreSQL for analytics.
 
-<sub>TorchBearer started at the Hack-Nation × ElevenLabs 7th Global AI Hackathon (original repo: <a href="https://github.com/Narahari2364/Torchbearer">Narahari2364/Torchbearer</a>).</sub>
+<sub>TorchBearer started at the Hack-Nation × ElevenLabs 7th Global AI Hackathon.</sub>
