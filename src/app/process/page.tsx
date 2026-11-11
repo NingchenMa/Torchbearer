@@ -10,6 +10,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { EXAMPLE_ID, getWorkflow, listWorkflows } from "@/lib/session";
 import type { WorkflowRecord, WorkflowSummary, WorkMapStep } from "@/lib/types";
+import { ProcessDiagram } from "@/features/workmap/ProcessDiagram";
 
 const readId = () => {
   try {
@@ -115,7 +116,6 @@ export default function ProcessMapPage() {
   const decisions = steps.filter((s) => s.process?.decision || s.guardrails.length).length;
   const questions = steps.reduce((a, s) => a + (s.process?.unknown.length ?? 0), 0);
   const order = new Map(steps.map((s, i) => [s.id, i + 1]));
-  const span = Math.max(1, timed.length ? timed[timed.length - 1].start + (timed[timed.length - 1].duration ?? Math.max(5, total / Math.max(1, timed.length))) : 1);
 
   const tiles: [string, string][] = [
     [String(steps.length), "Steps"],
@@ -176,42 +176,18 @@ export default function ProcessMapPage() {
           </p>
         )}
 
-        {/* Time per step, one lane per tool */}
-        <h2 className="mb-3 text-[13px] font-bold uppercase tracking-[.12em] text-[#667085]">Timeline{built ? " by tool" : ""}</h2>
-        <div className="mb-8 rounded-md border border-line bg-white p-4">
-          {(built ? tools : ["All steps"]).map((tool) => (
-            <div key={tool} className="mb-3 grid grid-cols-1 gap-1 sm:mb-2 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-center sm:gap-3">
-              <div className="text-[13px] text-[#344054] sm:truncate" title={tool}>{tool}</div>
-              <div className="relative h-7 rounded-sm bg-[#f2f4f7]">
-                {timed
-                  .filter((t) => !built || t.step.process?.tool === tool)
-                  .map((t) => (
-                    <div
-                      key={t.step.id}
-                      title={`Step ${t.index + 1}: ${t.step.title} · ${fmt(t.duration)}`}
-                      className="absolute top-0 grid h-7 w-[max(6px,var(--w))] place-items-center overflow-hidden rounded-sm text-[11px] font-bold text-white sm:w-[max(18px,var(--w))]"
-                      style={{
-                        left: `${(t.start / span) * 100}%`,
-                        ["--w" as string]: `${((t.duration ?? span / Math.max(4, timed.length * 2)) / span) * 100}%`,
-                        background: built ? color(tool) : "#5146d9",
-                        opacity: t.duration == null ? 0.55 : 1,
-                      }}
-                    >
-                      {/* On a phone the bars are too narrow for numbers; the step list below has them. */}
-                      <span className="hidden sm:inline">{t.index + 1}</span>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          ))}
-          <div className="mt-1 flex justify-between text-[11.5px] text-[#98a2b3] sm:pl-[192px]">
-            <span>0:00</span>
-            <span>{fmt(span)}</span>
-          </div>
-        </div>
+        {/* The whole process as a diagram: lanes per tool, rules as diamonds, durations on the arrows */}
+        <h2 className="mb-3 text-[13px] font-bold uppercase tracking-[.12em] text-[#667085]">Process diagram</h2>
+        <ProcessDiagram
+          timed={timed}
+          lanes={built && tools.length ? tools : ["All steps"]}
+          laneOf={(s) => (built && tools.length ? Math.max(0, tools.indexOf(s.process?.tool ?? "")) : 0)}
+          color={(lane) => (built ? color(lane) : "#5146d9")}
+          fmt={fmt}
+        />
 
         {/* The flow, step by step */}
-        <h2 className="mb-3 text-[13px] font-bold uppercase tracking-[.12em] text-[#667085]">Flow</h2>
+        <h2 className="mb-3 text-[13px] font-bold uppercase tracking-[.12em] text-[#667085]">Step details</h2>
         <ol className="flex flex-col">
           {timed.map(({ step: s, index, duration }) => {
             const p = s.process;
