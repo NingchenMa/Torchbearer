@@ -3,7 +3,7 @@
 // every FRAME_MS we grab a frame and report whether it changed (cheap 32x18 thumbnail diff),
 // so only changed screens go to the LLM and "no change for a while" can mean "paused".
 
-const FRAME_MS = 1000; // one screenshot per second
+const FRAME_MS = 500; // two screenshots per second; only changed ones go to the LLM, one call at a time
 
 export interface Frame {
   dataUrl: string;

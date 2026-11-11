@@ -27,7 +27,7 @@ export default function DesignPreview() {
     connected: true,
     status: "Listening…",
     listening: true,
-    idleText: "Work as usual. I'll stay quiet and only ask when you pause.",
+    idleText: "Work as usual and explain as you go. I'll ask whenever something isn't clear.",
     showBuild: false,
     onToggleOffRecord: () => setState(state === "off" ? "question" : "off"),
     onEndTask: noop,
@@ -61,7 +61,7 @@ export default function DesignPreview() {
           tasks={["Meal expense report"]}
           expectations={[
             "Watches <b>this Ledgerline window only</b>, nothing else on your screen.",
-            "Stays quiet while you work and asks a few short questions out loud when you pause.",
+            "Listens while you work and asks short questions out loud whenever something isn't clear.",
             "You can go <b>off the record</b> any time.",
             "Names and card numbers are hidden automatically.",
             "You review everything it learned before anyone else sees it.",
