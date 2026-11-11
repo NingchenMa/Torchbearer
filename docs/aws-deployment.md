@@ -1,6 +1,6 @@
 # Torchbearer on AWS: design and tech decisions
 
-Status: **live for testing**, branch `aws` of `github.com/NingchenMa/Torchbearer` (a fork of `Narahari2364/Torchbearer`).
+Status: **live for testing**, branch `aws` of `github.com/NingchenMa/Torchbearer`.
 Last updated: 2026-11-05.
 
 | | |
@@ -126,7 +126,7 @@ Use the production build to test voice. In `npm run dev`, React's development mo
 |---|---|---|
 | Decide whose accounts own the ElevenLabs and Gemini keys (the ElevenLabs key is on a personal account); move to company accounts | Team | Before VC demo |
 | Rotate all API keys (they have been shared in chat and copied between machines) | Team | After VC demo |
-| Merge uncommitted voice start-up fixes from local work (`useObserver.ts`, `useVoiceAgent.ts`) | Marissa / Hari | Before VC demo |
+| Merge uncommitted voice start-up fixes from local work (`useObserver.ts`, `useVoiceAgent.ts`) | Marissa | Before VC demo |
 | Replace the 2023 IAM access key of user `admin`; stop using root | Marissa | This month |
 | Aurora PostgreSQL | Team | First pilot customer |
 | Brand the Cognito sign-in page (logo, colours) | Marissa | Before VC demo |

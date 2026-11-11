@@ -50,7 +50,14 @@ for (const a of agents) {
     name: a.name,
     conversation_config: {
       // Expressive mode makes the LLM sprinkle audio tags like [slow] that slow the voice down mid-sentence.
-      tts: { expressive_mode: false },
+      // Same voice and speech settings on any account, so a new account's agents sound and listen the same.
+      tts: { model_id: "eleven_v4_turbo", voice_id: "cjVigY5qzO86Huf0OWal", expressive_mode: false },
+      asr: { provider: "scribe_realtime", quality: "high", user_input_audio_format: "pcm_16000" },
+      // The app reads the live transcript and agent replies from these events.
+      conversation: {
+        max_duration_seconds: 600,
+        client_events: ["audio", "interruption", "agent_response", "user_transcript", "agent_response_correction", "agent_tool_response"],
+      },
       // People go quiet for a long time while they work; the app decides when to check in ([IDLE]),
       // so ElevenLabs' own 7 s "Are you still there?" nudge stays out of the way.
       turn: { turn_timeout: 30 },

@@ -308,11 +308,15 @@ export default function MappingPage() {
         )}
       </div>
 
-      {exporting && <ExportDialog
-          map={{ ...map, steps: finalSteps }}
+      {exporting && (
+        <ExportDialog
+          map={{ ...map, steps: finalSteps.map((s) => ({ ...s, process: map.steps.find((x) => x.id === s.id)?.process ?? s.process })) }}
           meta={{ id: wf.id, name: wf.name, createdAt: wf.createdAt, trainedBy: library.find((w) => w.id === wf.id)?.trainedBy }}
           onClose={() => setExporting(false)}
-        />}
+          workflowId={isExample ? undefined : wf.id}
+          onBuilt={(next) => setRecord(next)}
+        />
+      )}
       {zoom && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(20,28,38,.6)] p-6" onClick={() => setZoom(null)}>
           {/* eslint-disable-next-line @next/next/no-img-element */}

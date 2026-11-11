@@ -3,20 +3,59 @@
 // include, preview exactly what the agent will read, then download.
 
 import { useState } from "react";
-import type { WorkMap } from "@/lib/types";
+import type { WorkflowRecord, WorkMap } from "@/lib/types";
 import Dialog, { btnIndigo, btnIndigoOutline } from "@/features/apprentice/Dialog";
-import { downloadText, toAgentJson, toAgentMarkdown, type ExportOptions } from "./exportAgent";
+import { DEFAULT_EXPORT, downloadText, toAgentJson, toAgentMarkdown, type ExportOptions } from "./exportAgent";
 import { buildSkillFiles, buildSkillZip, downloadBytes, type SkillInput } from "./skillFolder";
 
 export type ExportMeta = Pick<SkillInput, "id" | "name" | "createdAt" | "trainedBy">;
 
-export default function ExportDialog({ map, meta, onClose }: { map: WorkMap; meta: ExportMeta; onClose: () => void }) {
+export default function ExportDialog({
+  map,
+  meta,
+  onClose,
+  workflowId,
+  onBuilt,
+}: {
+  map: WorkMap;
+  meta: ExportMeta;
+  onClose: () => void;
+  /** Set for a saved workflow: lets the dialog add tools and data by building the process map. */
+  workflowId?: string;
+  onBuilt?: (record: WorkflowRecord) => void;
+}) {
   const [format, setFormat] = useState<"md" | "json" | "zip">("zip");
   const [screenshots, setScreenshots] = useState(true);
+  const [opts, setOpts] = useState<ExportOptions>(DEFAULT_EXPORT);
+  const [building, setBuilding] = useState(false);
+  const [buildError, setBuildError] = useState<string | null>(null);
+  const built = !!map.processBuiltAt;
   const skill: SkillInput = { ...meta, map, steps: map.steps, includeScreenshots: screenshots };
-  const [opts, setOpts] = useState<ExportOptions>({ quotes: true, guardrails: true, screenMoments: false });
+
+  async function build() {
+    if (!workflowId) return;
+    setBuilding(true);
+    setBuildError(null);
+    try {
+      const r = await fetch("/api/processmap", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: workflowId }) });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(String(data.error ?? ""));
+      onBuilt?.(data as WorkflowRecord);
+    } catch (e) {
+      const m = e instanceof Error ? e.message : "";
+      setBuildError(/took longer|503|429|high demand/i.test(m) ? "The AI model is busy right now. Try again in a minute." : "Couldn't add them. Try again.");
+    } finally {
+      setBuilding(false);
+    }
+  }
+
   const zipName = buildSkillZip({ ...skill, includeScreenshots: false }).filename;
-  const text = format === "zip" ? (buildSkillFiles({ ...skill, includeScreenshots: false })["SKILL.md"] as string) : format === "md" ? toAgentMarkdown(map, opts) : toAgentJson(map, opts);
+  const text =
+    format === "zip"
+      ? (buildSkillFiles({ ...skill, includeScreenshots: false })["SKILL.md"] as string)
+      : format === "md"
+        ? toAgentMarkdown(map, opts)
+        : toAgentJson(map, opts);
   const file = format === "zip" ? zipName : format === "md" ? "apprentice-rules.md" : "apprentice-rules.json";
   const download = () => {
     if (format === "zip") {
@@ -24,6 +63,17 @@ export default function ExportDialog({ map, meta, onClose }: { map: WorkMap; met
       downloadBytes(z.filename, z.bytes);
     } else downloadText(file, text, format === "md" ? "text/markdown" : "application/json");
   };
+  /** Offer to work out tools, data and step links when the process map isn't built yet. */
+  const buildBox =
+    !built && workflowId ? (
+      <div className="rounded-sm border border-[#f0d58a] bg-warn-soft p-3 text-[13.5px] text-[#5c4400]">
+        Tools, the data each step needs and produces, and how steps connect aren&apos;t worked out yet.
+        <button onClick={build} disabled={building} className="mt-2 block h-9 rounded-sm bg-indigo px-3 text-[14px] text-white hover:bg-indigo-dark disabled:opacity-60">
+          {building ? "Working it out… (about 15 s)" : "Add them now"}
+        </button>
+        {buildError && <span className="mt-1 block text-err">{buildError}</span>}
+      </div>
+    ) : null;
 
   const formatOption = (value: "md" | "json" | "zip", title: string, sub: string) => (
     <label className={`flex cursor-pointer gap-3 border p-3 ${format === value ? "border-indigo bg-indigo-soft" : "border-line"}`}>
@@ -70,13 +120,16 @@ export default function ExportDialog({ map, meta, onClose }: { map: WorkMap; met
                 <input type="checkbox" checked={screenshots} onChange={(e) => setScreenshots(e.target.checked)} className="h-4 w-4 accent-[#5146d9]" />
                 Screenshots
               </label>
+              {buildBox}
               <p className="text-[13px] text-[#444]">Text has names and card numbers removed. Screenshots are copied as recorded, so check them before sharing.</p>
             </>
           ) : (
             <>
               {include("quotes", "Expert quotes")}
               {include("guardrails", "Guardrails")}
-              {include("screenMoments", "Screen moments (times)")}
+              {include("process", "Tools, data and step links")}
+              {include("screenMoments", "Timing of each step")}
+              {opts.process && buildBox}
               <p className="text-[13px] text-[#444]">Names and card numbers are removed from the export.</p>
             </>
           )}

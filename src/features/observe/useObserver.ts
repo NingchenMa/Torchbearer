@@ -95,7 +95,9 @@ export function useObserver(onWorkMapReady: (workflowId: string) => void) {
 
   async function onFrame(f: Frame) {
     const l = live.current;
-    if (l.offRecord || l.phase === "building") return;
+    // Only the task itself is recorded: nothing while off the record, and nothing after Stop
+    // recording (during the debrief the expert often switches to other apps).
+    if (l.offRecord || l.phase !== "task") return;
     // A change that lands while a call is running must not be lost: send it with the next frame.
     if (inFlight.current) {
       if (f.changed) missed.current = true;
@@ -110,7 +112,7 @@ export function useObserver(onWorkMapReady: (workflowId: string) => void) {
       const res = await fetch("/api/observe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ frame: f.dataUrl, previous: lastSent.current, workflow: l.workflow, actions: actionsRef.current, qa: l.qa, asked: asked.current, now }),
+        body: JSON.stringify({ task: workflowName.current, frame: f.dataUrl, previous: lastSent.current, workflow: l.workflow, actions: actionsRef.current, qa: l.qa, asked: asked.current, now }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -221,6 +223,7 @@ export function useObserver(onWorkMapReady: (workflowId: string) => void) {
 
   function endTask() {
     setPhase("debrief");
+    watcher.current.paused = true; // stop reading the screen; sharing stays on until Send to Mapping
     pending.current = null;
     if (!agent.connected) return; // no voice (e.g. out of credits): go straight to building the map
     agent.sendUserMessage(
