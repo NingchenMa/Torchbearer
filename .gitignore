@@ -150,3 +150,6 @@ vite.config.ts.timestamp-*
 .vercel
 .env*
 !.env.example
+
+# Personal notes and plans (not for the repo)
+docs/temp/
