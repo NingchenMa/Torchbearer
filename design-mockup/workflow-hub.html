@@ -20,6 +20,7 @@
     --sm: 3px; --md: 6px;
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; } /* so a rule like .nav a { display: flex } never shows a hidden item */
   html, body { height: 100%; }
   body { margin: 0; font: 15px/1.5 Roboto, "Segoe UI", Helvetica, Arial, sans-serif; color: var(--ink); background: var(--page); }
   button, input, select, textarea { font: inherit; }
