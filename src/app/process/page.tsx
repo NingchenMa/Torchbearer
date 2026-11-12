@@ -8,7 +8,8 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { EXAMPLE_ID, getWorkflow, listWorkflows } from "@/lib/session";
+import NoAccess from "@/features/nav/NoAccess";
+import { EXAMPLE_ID, getWorkflowAccess, listWorkflows } from "@/lib/session";
 import type { WorkflowRecord, WorkflowSummary, WorkMapStep } from "@/lib/types";
 import { ProcessDiagram } from "@/features/workmap/ProcessDiagram";
 
@@ -59,6 +60,7 @@ export default function ProcessMapPage() {
   const [library, setLibrary] = useState<WorkflowSummary[]>([]);
   const [record, setRecord] = useState<WorkflowRecord | null>(null);
   const [loading, setLoading] = useState(true);
+  const [denied, setDenied] = useState(false); // the server refused: not the recorder, not a manager
   const [building, setBuilding] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,8 +69,9 @@ export default function ProcessMapPage() {
     listWorkflows().then(async (list) => {
       if (!live) return;
       setLibrary(list);
-      const loaded = await getWorkflow(idParam ?? list[0]?.id);
+      const { record: loaded, denied: refused } = await getWorkflowAccess(idParam ?? list[0]?.id);
       if (live) {
+        setDenied(refused);
         setRecord(loaded);
         setLoading(false);
       }
@@ -97,11 +100,12 @@ export default function ProcessMapPage() {
   if (loading) {
     return <div className="grid min-h-full place-items-center bg-[#f6f8fc] text-[15px] text-[#667085]">Loading the workflow…</div>;
   }
+  if (denied) return <NoAccess message="You lack permission to edit or review this workflow." />;
   if (!record) {
     return (
       <div className="grid min-h-full place-items-center bg-[#f6f8fc] p-6 text-center text-[15px] text-[#475467]">
         <div>
-          No recorded workflow yet. <Link href="/capture" className="text-indigo underline">Record one in Teaching</Link>.
+          No recorded workflow yet. <Link href="/capture" className="text-indigo underline">Record one</Link>.
         </div>
       </div>
     );
