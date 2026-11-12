@@ -3,7 +3,8 @@
 //   Workflows   the vault, plus a workflow's Work Map and Process map
 //   Reviews     practice sessions to decide on, with a count of what is waiting
 //   Assign      give a workflow to a new hire (managers and admins; others are told they lack access)
-//   Training    the one module: the work assigned to you
+//   Training    the work assigned to you
+//   Access management   admins only: change people's access and add members
 // At the bottom: the company, who is signed in, their role, and Sign out.
 
 import Link from "next/link";
@@ -24,7 +25,8 @@ const ITEMS = [
   { href: "/review", label: "Reviews", match: ["/review"], icon: <path d="M5 12l5 5L20 7" />, badge: true },
   { href: "/assign", label: "Assign", match: ["/assign"], icon: <path d="M12 5v14M5 12h14" /> },
 ];
-const MODULE = { href: "/teach", label: "Training", match: ["/teach"], icon: <><path d="M4 6l8-3 8 3-8 3-8-3z" /><path d="M7 10.5V15c0 1.5 2.5 3 5 3s5-1.5 5-3v-4.5" /></> };
+const TRAINING = { href: "/teach", label: "Training", match: ["/teach"], icon: <><path d="M4 6l8-3 8 3-8 3-8-3z" /><path d="M7 10.5V15c0 1.5 2.5 3 5 3s5-1.5 5-3v-4.5" /></> };
+const ACCESS = { href: "/access", label: "Access management", match: ["/access"], icon: <><path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6l8-3z" /><path d="M9 12l2 2 4-4" /></> };
 
 /** Pages without the sidebar: the public signed-out page. */
 const HIDDEN = ["/signed-out"];
@@ -85,8 +87,11 @@ export default function Sidebar() {
       <div className="mx-2 mb-2 mt-1 hidden text-[11.5px] font-bold uppercase tracking-[.12em] text-[#667085] md:block">Workflows</div>
       <nav className="flex flex-col gap-1" aria-label="Workflows">{ITEMS.map(link)}</nav>
 
-      <div className="mx-2 mb-2 mt-6 hidden text-[11.5px] font-bold uppercase tracking-[.12em] text-[#667085] md:block">Module</div>
-      <nav className="mt-4 flex flex-col gap-1 md:mt-0" aria-label="Module">{link(MODULE)}</nav>
+      <div className="mx-2 mb-2 mt-6 hidden text-[11.5px] font-bold uppercase tracking-[.12em] text-[#667085] md:block">Modules</div>
+      <nav className="mt-4 flex flex-col gap-1 md:mt-0" aria-label="Modules">
+        {link(TRAINING)}
+        {me?.role === "admin" && link(ACCESS)}
+      </nav>
 
       {me && (
         <div className="mt-auto hidden rounded-md border border-line bg-panel px-3.5 py-3 text-[13px] md:block">
