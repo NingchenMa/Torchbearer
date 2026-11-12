@@ -108,6 +108,7 @@ export interface ReviewItem {
   comment?: string;
   workflowId?: string;
   stepId?: string;
+  stepLabel?: string; // e.g. "Step 5 · Attach approval", for the reviewer
 }
 
 /** A recorded workflow, saved under the name the expert gave it. */
@@ -164,9 +165,15 @@ export interface AssignmentView extends Assignment {
   relearn: number;
 }
 
-/** The supervisor's review batch for one learner. */
+/**
+ * The review items from one person's practice on one workflow. Stored per workflow and learner
+ * (reviews/<workflow>/<learner id>.json). Seen by managers, admins, and the person who recorded the workflow.
+ */
 export interface ReviewBatch {
-  learner: string;
+  learner: string; // display name
+  learnerId: string; // Cognito user ID
+  workflowId: string;
+  workflowName: string;
   items: ReviewItem[];
   submitted: boolean;
 }
