@@ -1,30 +1,25 @@
 // GET / PUT / DELETE /api/workflows/<id> — one trained workflow of the signed-in user's company
 // (steps, the expert's reasons and rules, screenshots, approval state).
+//   GET     a manager, an admin, or the person who recorded it
+//   PUT     the same people; anyone may create a new workflow, which they then own
+//   DELETE  managers and admins only
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
-import { orgDb, safe } from "@/lib/db";
+import { orgDb } from "@/lib/db";
+import { canDeleteWorkflow, canManageWorkflow } from "@/lib/roles";
 import type { WorkflowRecord, WorkflowSummary } from "@/lib/types";
+import { WORKFLOW_INDEX, openWorkflow, summaryOf, workflowPath } from "@/lib/workflows";
 
 export const dynamic = "force-dynamic";
 
 type Ctx = { params: Promise<{ id: string }> };
-const INDEX = "workflows/index.json";
-
-const summary = (w: WorkflowRecord, trainedBy?: string): WorkflowSummary => ({
-  id: w.id,
-  name: w.name,
-  createdAt: w.createdAt,
-  published: !!w.map.published,
-  stepCount: w.map.steps.length,
-  ...(trainedBy ? { trainedBy } : {}),
-});
 
 export async function GET(_req: Request, { params }: Ctx) {
   const u = await requireUser();
   if (u instanceof NextResponse) return u;
   const { id } = await params;
-  const record = await orgDb(u.org).readJson<WorkflowRecord>(`workflows/${safe(id)}.json`);
-  return record ? NextResponse.json(record) : NextResponse.json({ error: "Not found" }, { status: 404 });
+  const record = await openWorkflow(u, id);
+  return record instanceof NextResponse ? record : NextResponse.json(record);
 }
 
 export async function PUT(req: Request, { params }: Ctx) {
@@ -32,22 +27,34 @@ export async function PUT(req: Request, { params }: Ctx) {
   if (u instanceof NextResponse) return u;
   const db = orgDb(u.org);
   const { id } = await params;
-  const record = (await req.json()) as WorkflowRecord;
-  if (!record?.map?.steps || record.id !== id) return NextResponse.json({ error: "Bad workflow" }, { status: 400 });
-  await db.writeJson(`workflows/${safe(id)}.json`, record);
-  const index = (await db.readJson<WorkflowSummary[]>(INDEX)) ?? [];
+  const body = (await req.json()) as WorkflowRecord;
+  if (!body?.map?.steps || body.id !== id) return NextResponse.json({ error: "Bad workflow" }, { status: 400 });
+
+  // A workflow that already exists can only be changed by someone allowed to manage it.
+  const existing = await db.readJson<WorkflowRecord>(workflowPath(id));
+  if (existing && !canManageWorkflow(u, existing)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  // The owner is decided here, never taken from the browser: the recorder on first save, unchanged after that.
+  const { ownerId: _ignored, ...rest } = body;
+  void _ignored;
+  const ownerId = existing ? existing.ownerId : u.id;
+  const record: WorkflowRecord = { ...rest, ...(ownerId ? { ownerId } : {}) };
+  await db.writeJson(workflowPath(id), record);
+
+  const index = (await db.readJson<WorkflowSummary[]>(WORKFLOW_INDEX)) ?? [];
   const before = index.find((w) => w.id === id);
-  await db.writeJson(INDEX, [summary(record, before?.trainedBy ?? u.name), ...index.filter((w) => w.id !== id)]);
+  await db.writeJson(WORKFLOW_INDEX, [summaryOf(record, before?.trainedBy ?? u.name), ...index.filter((w) => w.id !== id)]);
   return NextResponse.json({ ok: true });
 }
 
 export async function DELETE(_req: Request, { params }: Ctx) {
   const u = await requireUser();
   if (u instanceof NextResponse) return u;
+  if (!canDeleteWorkflow(u)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const db = orgDb(u.org);
   const { id } = await params;
-  await db.remove(`workflows/${safe(id)}.json`);
-  const index = (await db.readJson<WorkflowSummary[]>(INDEX)) ?? [];
-  await db.writeJson(INDEX, index.filter((w) => w.id !== id));
+  await db.remove(workflowPath(id));
+  const index = (await db.readJson<WorkflowSummary[]>(WORKFLOW_INDEX)) ?? [];
+  await db.writeJson(WORKFLOW_INDEX, index.filter((w) => w.id !== id));
   return NextResponse.json({ ok: true });
 }
