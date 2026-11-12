@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { connection } from "next/server";
 import { Lato, Libre_Caslon_Display, Libre_Caslon_Text, Roboto } from "next/font/google";
 import MockBadge from "@/features/mock/MockBadge";
-import AppNav from "@/features/nav/AppNav";
+import Sidebar from "@/features/nav/Sidebar";
 import "./globals.css";
 
 // Fonts of the product website: Libre Caslon for headings, Lato for reading text.
@@ -22,9 +22,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   await connection();
   return (
     <html lang="en" className={`${roboto.variable} ${lato.variable} ${caslonDisplay.variable} ${caslonText.variable} h-full antialiased`}>
-      <body className="flex h-full flex-col overflow-hidden font-sans">
-        <AppNav />
-        <main className="min-h-0 flex-1 overflow-auto">{children}</main>
+      <body className="flex h-full overflow-hidden font-sans">
+        <Sidebar />
+        <main className="min-h-0 min-w-0 flex-1 overflow-auto">{children}</main>
         <MockBadge />
       </body>
     </html>
