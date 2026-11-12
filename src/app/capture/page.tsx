@@ -41,18 +41,18 @@ function Capture() {
     </div>
   ) : (
     <div className="flex flex-col gap-2">
-      <label htmlFor="page-wf-name" className="text-[12px] font-bold uppercase tracking-[.12em] text-[#667085]">Name this workflow</label>
+      <label htmlFor="page-wf-name" className="text-[12px] font-bold uppercase tracking-[.14em] text-crimson">Name this workflow</label>
       <input
         id="page-wf-name"
         value={name}
         onChange={(e) => setName(e.target.value)}
         placeholder="e.g. Meal expense report"
-        className="h-11 rounded-sm border border-[#9aa0a6] px-3 text-[16px] focus:border-indigo focus:outline-none"
+        className="h-11 rounded-full border border-line px-4 text-[16px] outline-none transition-[border-color,box-shadow] focus:border-crimson focus:ring-2 focus:ring-crimson/15"
       />
       <button
         onClick={() => o.start(name)}
         disabled={!name.trim()}
-        className="h-11 rounded-sm bg-indigo text-[16px] text-white hover:bg-indigo-dark disabled:opacity-40"
+        className="tb-btn-amber h-12 w-full text-[16px] disabled:cursor-not-allowed disabled:opacity-40"
       >
         ● Start recording
       </button>
@@ -64,9 +64,9 @@ function Capture() {
   return (
     <>
       <Launcher
-        eyebrow="Teaching · An expert teaches TorchBearer"
-        title={<>Torchbearer <span className="font-medium text-indigo">watches the expert work</span></>}
-        text="Launch it and it floats on your screen. Start recording, work in any browser as usual, and answer when it asks why. Stop recording and it shows you everything it observed."
+        eyebrow="Teaching · record a workflow"
+        title={<>Do the task. <span className="font-serif italic text-amber">Explain as you go.</span></>}
+        text="TorchBearer floats on your screen while you work in any browser. It writes down each step from the screen and asks you why whenever something isn't clear. When you stop, you check what it wrote."
         launched={pip.isOpen}
         canPip={canPip}
         failed={pip.failed}

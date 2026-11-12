@@ -12,7 +12,9 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1162.0",
     "@elevenlabs/react": "^1.16.0",
+    "@xyflow/react": "^12.3.6",
     "aws-jwt-verify": "^5.2.1",
+    "lucide-react": "^0.468.0",
     "next": "16.3.8",
     "react": "19.2.8",
     "react-dom": "19.2.8"

@@ -29,6 +29,7 @@ For EVERY step return:
 - decision: the judgment call made in this step and the reason, from the expert's reason/rules. "" for routine steps. Never invent a reason.
 - unknown: short questions to the expert, one per unclear point (always one for an input whose source is unknown), about what the recording can't tell (where an input comes from, who receives the output, a missing reason). [] if nothing important is unclear.
 
+Expert answers: when a step lists "expert answered", use those answers (for example as an input's source or the decision's reason) and never ask that question again.
 Rules: a step only "feedsInto" a later step when that later step actually uses something it produced. Stay generic about the case (no people's names, no amounts or ids unless they are a rule). Never invent tools, people or systems you can't see or read. Keep every string short.
 Return JSON only: {"steps":[{"id": string, "tool": string, "inputs":[{"name": string, "source": string}], "outputs":[string], "feedsInto":[string], "decision": string, "unknown":[string]}]}`;
 
@@ -52,7 +53,7 @@ export async function POST(req: Request) {
         (s, i) =>
           `Step ${i + 1} [${s.id}] ${s.time} ${s.title}${s.decision ? ` | seen: ${s.decision}` : ""}${s.reason ? ` | why: ${s.reason}` : ""}${
             s.guardrails.length ? ` | rules: ${s.guardrails.join("; ")}` : ""
-          }`,
+          }${s.answers?.length ? ` | expert answered: ${s.answers.map((x) => `${x.q} → ${x.a}`).join("; ")}` : ""}`,
       )
       .join("\n"),
   );
@@ -87,7 +88,8 @@ export async function POST(req: Request) {
         const inputs = (Array.isArray(p.inputs) ? p.inputs : [])
           .map((x) => ({ name: str(x?.name), source: stepRefs(str(x?.source)) || "unknown" }))
           .filter((x) => x.name);
-        const unknown = strs(p.unknown).map(stepRefs);
+        const answered = new Set((s.answers ?? []).map((x) => x.q.trim().toLowerCase()));
+        const unknown = strs(p.unknown).map(stepRefs).filter((q) => !answered.has(q.trim().toLowerCase()));
         // An input nobody knows the source of is a question for the expert (unless the model already asked one).
         if (!unknown.length)
           for (const x of inputs) if (/^unknown$/i.test(x.source)) unknown.push(`Where do you get the ${x.name.toLowerCase()} from?`);

@@ -55,6 +55,12 @@ function detail(map: WorkMap) {
   });
 }
 
+/** The process map's questions the expert has not answered yet. */
+function openOf(step: WorkMapStep): string[] {
+  const answered = new Set((step.answers ?? []).map((x) => x.q.trim().toLowerCase()));
+  return (step.process?.unknown ?? []).filter((q) => !answered.has(q.trim().toLowerCase()));
+}
+
 export function toAgentMarkdown(map: WorkMap, opts: ExportOptions = DEFAULT_EXPORT): string {
   const d = detail(map);
   const built = !!map.processBuiltAt && d.some((x) => x.p);
@@ -93,8 +99,9 @@ export function toAgentMarkdown(map: WorkMap, opts: ExportOptions = DEFAULT_EXPO
       if (x.p.inputs.length) L.push(`- Needs: ${x.p.inputs.map((i) => `${i.name} (from ${i.source})`).join("; ")}`);
       if (x.uses.length) L.push(`- Uses what step${x.uses.length > 1 ? "s" : ""} ${x.uses.join(", ")} produced`);
       if (x.p.outputs.length) L.push(`- Produces: ${x.p.outputs.join("; ")}${x.usedIn.length ? ` → used in step${x.usedIn.length > 1 ? "s" : ""} ${x.usedIn.join(", ")}` : ""}`);
-      for (const q of x.p.unknown) L.push(`- Open question: ${q}`);
+      for (const q of openOf(x.step)) L.push(`- Open question: ${q}`);
     }
+    for (const ans of x.step.answers ?? []) L.push(`- Expert answered "${ans.q}": ${ans.a}`);
     L.push(`- Checked: ${x.review}`);
   }
 
@@ -112,7 +119,7 @@ export function toAgentMarkdown(map: WorkMap, opts: ExportOptions = DEFAULT_EXPO
     }
   }
 
-  const open = [...map.gaps, ...(opts.process ? d.flatMap((x) => (x.p?.unknown ?? []).map((q) => `${q} (step ${x.n})`)) : [])];
+  const open = [...map.gaps, ...(opts.process ? d.flatMap((x) => openOf(x.step).map((q) => `${q} (step ${x.n})`)) : [])];
   L.push("", "## Open questions (ask a person)");
   if (open.length) for (const q of open) L.push(`- ${q}`);
   else L.push("- None recorded.");
@@ -141,9 +148,10 @@ export function toAgentJson(map: WorkMap, opts: ExportOptions = DEFAULT_EXPORT):
           outputs: x.p.outputs,
           usesOutputOfSteps: x.uses,
           outputUsedInSteps: x.usedIn,
-          openQuestions: x.p.unknown,
+          openQuestions: openOf(x.step),
         }
       : {}),
+    expertAnswers: (x.step.answers ?? []).map(({ q, a }) => ({ question: q, answer: a })),
     checked: x.review,
   }));
   return redact(
