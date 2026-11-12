@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Torchbearer · Supervisor review (sketch)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* Tokens copied from src/app/globals.css and the Review page, so the sketch looks like the product. */
+  :root {
+    --brand: #2f74d0; --brand-dark: #1f4e8c; --brand-soft: #e3f0fc;
+    --indigo: #5146d9; --indigo-dark: #3f35b8; --indigo-soft: #f1f0ff;
+    --ink: #212121; --head: #1f2d3d; --body: #475467; --muted: #667085;
+    --panel: #f8f8f8; --panel2: #f6f7f9; --line: #e3e3e3; --page: #f6f8fc;
+    --ok: #2e7d4f; --ok-soft: #e3f2e8; --ok-line: #bfe3cc;
+    --warn: #e2a100; --warn-soft: #fff6db; --warn-text: #7a5a00;
+    --err: #c62828; --err-soft: #fdecec;
+    --sm: 3px; --md: 6px;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; font: 15px/1.5 Roboto, "Segoe UI", Helvetica, Arial, sans-serif; color: var(--ink); background: var(--page); }
+  button, input, select { font: inherit; }
+  button { cursor: pointer; }
+  a { color: var(--brand); }
+  :focus-visible { outline: 2px solid var(--indigo); outline-offset: 2px; }
+
+  /* ---------- sidebar: white like the product's top bar, indigo marks the active item ---------- */
+  .sidebar { position: fixed; inset: 0 auto 0 0; width: 240px; display: flex; flex-direction: column; background: #fff; border-right: 1px solid var(--line); padding: 14px 16px 18px; }
+  .logo { display: flex; align-items: center; gap: 10px; padding: 4px 4px 18px; }
+  .logo .tile { width: 32px; height: 32px; border-radius: 9px; background: var(--indigo); display: grid; place-items: center; }
+  .logo b { font-size: 15px; font-weight: 500; color: var(--head); }
+  .nav-label { margin: 10px 8px 8px; font-size: 12px; font-weight: 700; letter-spacing: .12em; color: #667085; text-transform: uppercase; }
+  .nav { display: flex; flex-direction: column; gap: 4px; }
+  .nav a { position: relative; display: flex; align-items: center; gap: 12px; height: 44px; padding: 0 14px; border-radius: var(--sm); color: var(--body); text-decoration: none; }
+  .nav a:hover { background: var(--panel2); color: var(--head); }
+  .nav a[aria-current="page"] { background: var(--indigo-soft); color: var(--indigo); font-weight: 500; }
+  .nav a[aria-current="page"]::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0; background: var(--indigo); }
+  .nav svg { width: 18px; height: 18px; flex: none; }
+  .nav .count { margin-left: auto; min-width: 22px; padding: 0 7px; border-radius: 11px; background: var(--warn-soft); color: var(--warn-text); border: 1px solid #f0d58a; font-size: 12px; font-weight: 500; text-align: center; }
+  .who { margin-top: auto; padding: 12px 8px 0; border-top: 1px solid var(--line); font-size: 13px; }
+  .who .co { color: var(--head); font-weight: 500; }
+  .who .em { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .who a { display: inline-block; margin-top: 6px; color: var(--muted); text-decoration: none; }
+  .who a:hover { color: var(--indigo); }
+
+  /* ---------- hero (same gradient, chip and light headline as the product) ---------- */
+  .shell { margin-left: 240px; min-height: 100%; padding-bottom: 96px; }
+  .hero { border-bottom: 1px solid var(--line); background: linear-gradient(180deg, #f3f2ff 0%, #fff 100%); }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+  .hero .wrap { padding-top: 26px; padding-bottom: 28px; }
+  .eyebrows { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .eyebrow { border: 1px solid rgba(81,70,217,.3); background: var(--indigo-soft); color: var(--indigo); border-radius: var(--sm); padding: 4px 10px; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+  .pill { border-radius: 999px; padding: 4px 10px; font-size: 12.5px; font-weight: 500; background: var(--warn-soft); color: var(--warn-text); }
+  .pill.ok { background: var(--ok-soft); color: var(--ok); }
+  h1 { margin: 16px 0 0; font-size: 42px; line-height: 1.1; letter-spacing: -.01em; font-weight: 300; color: var(--head); }
+  h1 em { font-style: normal; font-weight: 500; color: var(--indigo); }
+  .lead { margin: 8px 0 0; max-width: 680px; font-size: 16.5px; color: var(--body); }
+  .tools { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 20px; }
+  select { height: 40px; padding: 0 12px; border: 1px solid #9aa0a6; border-radius: var(--sm); background: #fff; color: var(--ink); }
+  .seg { display: inline-flex; height: 40px; border: 1px solid #9aa0a6; border-radius: var(--sm); overflow: hidden; background: #fff; }
+  .seg button { border: 0; background: #fff; padding: 0 16px; color: var(--body); }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button[aria-pressed="true"] { background: var(--indigo); color: #fff; }
+
+  /* ---------- list ---------- */
+  .content { padding-top: 22px; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
+  .stat { background: #fff; border: 1px solid var(--line); border-radius: var(--md); padding: 12px 16px; }
+  .stat span { display: block; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .stat b { font-size: 26px; font-weight: 500; line-height: 1.3; }
+  .section-title { display: flex; align-items: center; gap: 10px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--panel2); padding: 10px 16px; margin: 24px 0 14px; font-size: 13px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #444; }
+  .section-title:first-child { margin-top: 0; }
+  .section-title .av { width: 24px; height: 24px; border-radius: 50%; background: var(--indigo-soft); color: var(--indigo); display: grid; place-items: center; font-size: 10.5px; letter-spacing: 0; }
+  .section-title .meta { margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--muted); }
+  .section-title button { border: 0; background: none; color: var(--muted); text-transform: none; letter-spacing: 0; font-weight: 400; }
+  .group.collapsed ol { display: none; }
+  ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
+
+  .item { overflow: hidden; background: #fff; border: 1px solid var(--line); border-radius: var(--md); box-shadow: 0 8px 24px rgba(16,24,40,.05); display: grid; grid-template-columns: 300px minmax(0, 1fr); }
+  .shot { position: relative; min-height: 190px; background: #eef2f6; border-right: 1px solid var(--line); display: grid; place-items: center; font-size: 13px; color: var(--muted); background-image: repeating-linear-gradient(135deg, #eef2f6, #eef2f6 12px, #f3f6f9 12px, #f3f6f9 24px); }
+  .shot .tag { position: absolute; left: 8px; top: 8px; border-radius: var(--sm); background: rgba(0,0,0,.6); color: #fff; padding: 2px 6px; font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .shot button { position: absolute; right: 8px; bottom: 8px; border: 0; border-radius: var(--sm); background: rgba(255,255,255,.9); color: var(--brand); padding: 3px 8px; font-size: 12px; }
+  .body { padding: 20px; display: flex; flex-direction: column; gap: 10px; }
+  .where { color: var(--muted); font-size: 13px; }
+  .where b { color: var(--head); font-weight: 500; }
+  .label { display: block; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .note { border-radius: var(--md); background: var(--warn-soft); color: var(--warn-text); padding: 8px 12px; font-size: 14px; }
+  .decide { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; margin-top: 2px; }
+  .opt { height: 36px; padding: 0 12px; border-radius: var(--sm); border: 1px solid; background: #fff; font-size: 14px; }
+  .opt.fine { border-color: var(--ok); color: var(--ok); } .opt.fine:hover { background: var(--ok-soft); } .opt.fine[aria-pressed="true"] { background: var(--ok); color: #fff; }
+  .opt.needs { border-color: var(--err); color: var(--err); } .opt.needs:hover { background: var(--err-soft); } .opt.needs[aria-pressed="true"] { background: var(--err); color: #fff; }
+  .comment { height: 36px; min-width: 220px; flex: 1; padding: 0 8px; border: 1px solid #9aa0a6; border-radius: var(--sm); font-size: 14px; }
+  .comment:focus { border-color: var(--indigo); outline: none; }
+  .result-fine { color: var(--ok); } .result-needs { color: var(--err); }
+
+  .empty { display: none; border: 1px solid var(--line); border-radius: var(--md); background: #fff; padding: 32px; text-align: center; color: var(--body); }
+  .submitted { display: none; margin-top: 20px; border: 1px solid var(--ok-line); border-radius: var(--md); background: var(--ok-soft); color: var(--ok); padding: 12px 16px; }
+
+  /* ---------- bottom bar ---------- */
+  .bar { position: fixed; left: 240px; right: 0; bottom: 0; z-index: 5; display: flex; justify-content: flex-end; align-items: center; gap: 12px; height: 64px; padding: 0 24px; background: rgba(255,255,255,.96); border-top: 1px solid var(--line); }
+  .bar span { color: var(--muted); font-size: 14px; }
+  .submit { height: 44px; padding: 0 20px; border: 0; border-radius: var(--sm); background: var(--indigo); color: #fff; }
+  .submit:hover:not(:disabled) { background: var(--indigo-dark); }
+  .submit:disabled { opacity: .4; cursor: default; }
+
+  @media (max-width: 960px) { .item { grid-template-columns: 1fr; } .shot { border-right: 0; border-bottom: 1px solid var(--line); } .stats { grid-template-columns: 1fr; } h1 { font-size: 32px; } }
+  @media (max-width: 720px) {
+    .sidebar { width: 64px; padding: 12px 8px; align-items: center; }
+    .logo b, .nav-label, .nav span, .nav .count, .who { display: none; }
+    .nav a { width: 44px; padding: 0; justify-content: center; }
+    .shell { margin-left: 64px; } .bar { left: 64px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="logo">
+    <div class="tile"><svg width="22" height="22" viewBox="0 0 64 64" aria-hidden="true"><rect x="10" y="16" width="44" height="34" rx="12" fill="#fff"/><circle cx="24" cy="33" r="5" fill="#5146d9"/><circle cx="40" cy="33" r="5" fill="#5146d9"/><path d="M25 43c4 3 10 3 14 0" stroke="#5146d9" stroke-width="3" stroke-linecap="round" fill="none"/><path d="M32 16V9" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg></div>
+    <b>Torchbearer</b>
+  </div>
+  <div class="nav-label">Navigation</div>
+  <nav class="nav" aria-label="Main">
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span>Workflows</span></a>
+    <a href="#" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg><span>Reviews</span><b class="count" id="navCount">7</b></a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg><span>Assign</span></a>
+  </nav>
+  <div class="who">
+    <div class="co">Torchbearer Demo</div>
+    <div class="em">demo.supervisor@example.com</div>
+    <a href="#">Sign out</a>
+  </div>
+</aside>
+
+<div class="shell">
+  <section class="hero">
+    <div class="wrap">
+      <div class="eyebrows">
+        <span class="eyebrow">Supervisor review</span>
+        <span class="pill" id="statusPill">● 7 under review</span>
+      </div>
+      <h1>Practice sessions: <em>what might differ from the approved way</em></h1>
+      <p class="lead">Torchbearer never tells a new hire they were wrong. It sends anything that might differ from the expert&rsquo;s approved way here, for you to decide.</p>
+      <div class="tools">
+        <select id="fLearner" aria-label="Learner"><option value="">All learners</option></select>
+        <select id="fWorkflow" aria-label="Workflow"><option value="">All workflows</option></select>
+        <div class="seg" role="group" aria-label="Show">
+          <button data-view="all" aria-pressed="true">All</button>
+          <button data-view="open" aria-pressed="false">Undecided</button>
+          <button data-view="done" aria-pressed="false">Decided</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="wrap content">
+    <section class="stats" aria-label="Summary">
+      <div class="stat"><span>Under review</span><b id="sOpen" style="color:var(--warn-text)">0</b></div>
+      <div class="stat"><span>Fine as it is</span><b id="sFine" style="color:var(--ok)">0</b></div>
+      <div class="stat"><span>Needs correction</span><b id="sNeeds" style="color:var(--err)">0</b></div>
+    </section>
+    <div id="list"></div>
+    <div class="empty" id="empty">Nothing under review yet. Items appear here when the new hire practises in <a href="#">Teaching</a>.</div>
+    <p class="submitted" id="submitted">Review submitted. Steps marked fine count as learned; the rest stay on the new hire&rsquo;s relearn list for their next practice.</p>
+  </div>
+</div>
+
+<div class="bar">
+  <span id="decidedText">0/7 decided</span>
+  <button class="submit" id="submit" disabled>Submit review</button>
+</div>
+
+<script>
+// Sample data only. Same fields as the product's ReviewItem: observed, expected, note, decision, comment.
+const items = [
+  { id: 1, learner: "Alex Kim", workflow: "Meal expense report", step: "Step 4 · Attach approval", time: "03:42", observed: "Saved the expense without attaching the approval email.", expected: "Attached the supervisor's approval before saving, because the meal was over 30 per person.", note: "The 30-per-person limit may apply here." },
+  { id: 2, learner: "Alex Kim", workflow: "Meal expense report", step: "Step 2 · Choose expense type", time: "02:05", observed: "Picked Travel instead of Meal.", expected: "Picked Meal, because it was a restaurant bill.", note: "The receipt is from a restaurant." },
+  { id: 3, learner: "Alex Kim", workflow: "Meal expense report", step: "Step 6 · Add guests", time: "05:30", observed: "Added two guests.", expected: "Added all four guests listed on the receipt.", note: "Guest count changes the per-person amount." },
+  { id: 4, learner: "Jordan Patel", workflow: "Vendor onboarding", step: "Step 3 · Request tax form", time: "04:12", observed: "Skipped the tax form.", expected: "Requested the tax form for every new vendor.", note: "Required for every new vendor." },
+  { id: 5, learner: "Jordan Patel", workflow: "Vendor onboarding", step: "Step 4 · Create vendor record", time: "06:48", observed: "Used the company name from the email signature.", expected: "Used the legal name from the tax form.", note: "The legal name must match the tax form." },
+  { id: 6, learner: "Sam Rivera", workflow: "Meal expense report", step: "Step 3 · Add receipt", time: "02:50", observed: "Attached a photo of the menu.", expected: "Attached the paid receipt showing the total.", note: "The receipt must show the amount paid." },
+  { id: 7, learner: "Sam Rivera", workflow: "Meal expense report", step: "Step 5 · Enter tip", time: "04:01", observed: "Added the tip to the meal amount.", expected: "Entered the tip in its own field.", note: "" },
+];
+const state = { submitted: false, view: "all", learner: "", workflow: "" };
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const initials = (n) => n.split(" ").map((p) => p[0]).join("");
+
+function card(i, n) {
+  const controls = state.submitted
+    ? `<div class="decide">${i.decision === "fine" ? '<span class="result-fine">✓ Fine as it is</span>' : `<span class="result-needs">Needs correction${i.comment ? ": " + esc(i.comment) : ""}</span>`}</div>`
+    : `<div class="decide">
+         <button class="opt fine" data-d="fine" aria-pressed="${i.decision === "fine"}">✓ Fine as it is</button>
+         <button class="opt needs" data-d="needs_correction" aria-pressed="${i.decision === "needs_correction"}">Needs correction</button>
+         ${i.decision === "needs_correction" ? `<input class="comment" data-comment value="${esc(i.comment)}" placeholder="Tell the new hire what to change" aria-label="Comment">` : ""}
+       </div>`;
+  return `<li class="item" data-id="${i.id}">
+    <div class="shot">APP SCREEN<span class="tag">#${n} · ${esc(i.time)}</span><button data-zoom>View full size</button></div>
+    <div class="body">
+      <div class="where"><b>${esc(i.workflow)}</b> › ${esc(i.step)}</div>
+      <div><span class="label">New hire did</span>${esc(i.observed)}</div>
+      <div><span class="label">Approved way</span>${esc(i.expected)}</div>
+      ${i.note ? `<div class="note">Torchbearer: &ldquo;${esc(i.note)}&rdquo;</div>` : ""}
+      ${controls}
+    </div>
+  </li>`;
+}
+
+function render() {
+  const open = items.filter((i) => !i.decision).length;
+  const fine = items.filter((i) => i.decision === "fine").length;
+  const needs = items.filter((i) => i.decision === "needs_correction").length;
+  const decided = fine + needs;
+  $("#sOpen").textContent = open; $("#sFine").textContent = fine; $("#sNeeds").textContent = needs;
+  $("#navCount").textContent = open; $("#navCount").style.display = open ? "" : "none";
+  const pill = $("#statusPill");
+  pill.className = "pill" + (state.submitted ? " ok" : "");
+  pill.textContent = state.submitted ? "● Submitted" : open ? `● ${open} under review` : items.length ? "● All decided" : "● Nothing to review";
+  $("#decidedText").textContent = `${decided}/${items.length} decided`;
+  $("#submit").disabled = state.submitted || decided < items.length;
+  $("#submit").style.display = state.submitted ? "none" : "";
+  $("#submitted").style.display = state.submitted ? "block" : "none";
+
+  const shown = items.filter((i) =>
+    (!state.learner || i.learner === state.learner) && (!state.workflow || i.workflow === state.workflow) &&
+    (state.view === "all" || (state.view === "open" ? !i.decision : !!i.decision)));
+  const groups = {};
+  shown.forEach((i) => (groups[i.learner] ||= []).push(i));
+  let n = 0;
+  $("#list").innerHTML = Object.entries(groups).map(([name, list]) => {
+    const done = list.filter((i) => i.decision).length;
+    return `<div class="group" data-group="${esc(name)}">
+      <div class="section-title"><span class="av">${initials(name)}</span>${esc(name)}<span class="meta">${done}/${list.length} decided</span><button data-collapse>Collapse ▴</button></div>
+      <ol>${list.map((i) => card(i, ++n)).join("")}</ol></div>`;
+  }).join("");
+  $("#empty").style.display = shown.length ? "none" : "block";
+}
+
+document.addEventListener("click", (e) => {
+  const seg = e.target.closest("[data-view]");
+  if (seg) { state.view = seg.dataset.view; document.querySelectorAll("[data-view]").forEach((b) => b.setAttribute("aria-pressed", b === seg)); return render(); }
+  const col = e.target.closest("[data-collapse]");
+  if (col) { const g = col.closest(".group"); g.classList.toggle("collapsed"); col.textContent = g.classList.contains("collapsed") ? "Expand ▾" : "Collapse ▴"; return; }
+  const li = e.target.closest(".item"); const item = li && items.find((x) => x.id === +li.dataset.id);
+  if (!item || state.submitted) return;
+  const d = e.target.closest("[data-d]");
+  if (d) { item.decision = d.dataset.d; if (item.decision === "fine") item.comment = ""; render(); const c = document.querySelector(`.item[data-id="${item.id}"] .comment`); if (c) c.focus(); }
+});
+document.addEventListener("input", (e) => { if (!e.target.matches("[data-comment]")) return; const li = e.target.closest(".item"); items.find((x) => x.id === +li.dataset.id).comment = e.target.value; });
+$("#fLearner").addEventListener("change", (e) => { state.learner = e.target.value; render(); });
+$("#fWorkflow").addEventListener("change", (e) => { state.workflow = e.target.value; render(); });
+$("#submit").addEventListener("click", () => { state.submitted = true; render(); window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }); });
+
+[...new Set(items.map((i) => i.learner))].forEach((n) => $("#fLearner").insertAdjacentHTML("beforeend", `<option>${esc(n)}</option>`));
+[...new Set(items.map((i) => i.workflow))].forEach((n) => $("#fWorkflow").insertAdjacentHTML("beforeend", `<option>${esc(n)}</option>`));
+render();
+</script>
+</body>
+</html>
