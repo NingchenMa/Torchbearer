@@ -1,0 +1,905 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Torchbearer · Workflows module (sketch)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* Tokens copied from src/app/globals.css (aws branch). The shell is the product's real top bar:
+     one Training module, company and role in the workspace card. */
+  :root {
+    --brand: #2f74d0; --brand-dark: #1f4e8c; --brand-soft: #e3f0fc;
+    --indigo: #5146d9; --indigo-dark: #3f35b8; --indigo-soft: #f1f0ff;
+    --ink: #212121; --head: #1f2d3d; --body: #475467; --muted: #667085; --faint: #98a2b3;
+    --panel: #f8f8f8; --panel2: #f6f7f9; --line: #e3e3e3; --page: #f6f8fc;
+    --ok: #2e7d4f; --ok-soft: #e3f2e8; --ok-line: #bfe3cc;
+    --warn: #e2a100; --warn-soft: #fff6db; --warn-text: #7a5a00;
+    --err: #c62828; --err-soft: #fdecec;
+    --sm: 3px; --md: 6px;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; font: 15px/1.5 Roboto, "Segoe UI", Helvetica, Arial, sans-serif; color: var(--ink); background: var(--page); }
+  button, input, select, textarea { font: inherit; }
+  button { cursor: pointer; }
+  a { color: var(--brand); }
+  :focus-visible { outline: 2px solid var(--indigo); outline-offset: 2px; }
+
+  /* ---------- sidebar (layout from reviews-page-sketch.drawio, product colours) ---------- */
+  .sidebar { position: fixed; inset: 0 auto 0 0; z-index: 20; width: 240px; display: flex; flex-direction: column; background: #fff; border-right: 1px solid var(--line); padding: 16px 16px 18px; }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 4px 4px 22px; text-decoration: none; }
+  .brand .tile { width: 32px; height: 32px; flex: none; border-radius: 9px; background: var(--indigo); display: grid; place-items: center; }
+  .brand b { display: block; font-size: 15px; font-weight: 500; color: var(--head); line-height: 1.2; }
+  .nav-label { margin: 10px 8px 8px; font-size: 11.5px; font-weight: 700; letter-spacing: .12em; color: var(--muted); text-transform: uppercase; }
+  .nav { display: flex; flex-direction: column; gap: 4px; }
+  .nav a { position: relative; display: flex; align-items: center; gap: 12px; height: 44px; padding: 0 14px; border-radius: var(--sm); color: var(--body); text-decoration: none; }
+  .nav a:hover { background: var(--panel2); color: var(--head); }
+  .nav a[aria-current="page"] { background: var(--indigo-soft); color: var(--indigo); font-weight: 500; }
+  .nav a[aria-current="page"]::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0; background: var(--indigo); }
+  .nav svg { width: 18px; height: 18px; flex: none; }
+  .nav .count { margin-left: auto; min-width: 22px; padding: 0 7px; border-radius: 11px; background: var(--warn-soft); color: var(--warn-text); border: 1px solid #f0d58a; font-size: 12px; font-weight: 500; text-align: center; }
+  .ws { margin-top: auto; border: 1px solid var(--line); border-radius: var(--md); background: var(--panel); padding: 12px 14px; font-size: 13px; }
+  .ws b { display: block; color: var(--head); font-weight: 500; }
+  .ws .em { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ws a { display: inline-block; margin-top: 6px; color: var(--muted); text-decoration: none; } .ws a:hover { color: var(--indigo); }
+  .shell { margin-left: 240px; min-height: 100%; padding-bottom: 80px; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 0 28px; }
+  .head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding: 26px 0 20px; }
+  .head h1 { margin: 0 auto 0 0; font-size: 26px; line-height: 1.2; font-weight: 500; letter-spacing: 0; color: var(--head); }
+  .head .tools { margin: 0; }
+  .head .search { min-width: 200px; }
+  .head .built { margin: 0; }
+  .head .built .btn { height: 40px; }
+  .crumbs { padding-top: 22px; margin-bottom: 0; }
+  .crumbs + .head { padding-top: 12px; }
+  .content { padding-top: 0; }
+  .bar { left: 240px; }
+  @media (max-width: 720px) {
+    .sidebar { width: 64px; padding: 12px 8px; align-items: center; }
+    .brand b, .nav-label, .nav a span, .nav .count, .ws { display: none; }
+    .brand { padding-bottom: 14px; } .nav a { width: 44px; padding: 0; justify-content: center; }
+    .shell { margin-left: 64px; } .bar { left: 64px; padding: 0 14px; } .wrap { padding: 0 14px; }
+    .head h1 { font-size: 22px; }
+  }
+
+  /* ---------- hero ---------- */
+  .shell { min-height: 100%; padding-bottom: 72px; }
+  .hero { border-bottom: 1px solid var(--line); background: linear-gradient(180deg, #f3f2ff 0%, #fff 100%); }
+  .wrap { max-width: 1152px; margin: 0 auto; padding: 0 24px; }
+  .hero .wrap { padding-top: 26px; padding-bottom: 28px; }
+  .crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 16px; font-size: 13.5px; }
+  .crumbs a { color: var(--muted); text-decoration: none; } .crumbs a:hover { color: var(--indigo); }
+  .crumbs select { margin-left: auto; height: 36px; max-width: 320px; font-size: 14px; }
+  .eyebrows { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .eyebrow { border: 1px solid rgba(81,70,217,.3); background: var(--indigo-soft); color: var(--indigo); border-radius: var(--sm); padding: 4px 10px; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+  .pill { border-radius: 999px; padding: 4px 10px; font-size: 12.5px; font-weight: 500; background: var(--warn-soft); color: var(--warn-text); }
+  .pill.ok { background: var(--ok-soft); color: var(--ok); } .pill.late { background: var(--err-soft); color: var(--err); }
+  h1 { margin: 14px 0 0; font-size: 42px; line-height: 1.1; letter-spacing: -.01em; font-weight: 300; color: var(--head); }
+  h1 em { font-style: normal; font-weight: 500; color: var(--indigo); }
+  .lead { margin: 8px 0 0; max-width: 700px; font-size: 16.5px; color: var(--body); }
+  .tools { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 20px; }
+  select { height: 40px; padding: 0 12px; border: 1px solid #9aa0a6; border-radius: var(--sm); background: #fff; color: var(--ink); }
+  .seg { display: inline-flex; height: 40px; border: 1px solid #9aa0a6; border-radius: var(--sm); overflow: hidden; background: #fff; }
+  .seg button { border: 0; background: #fff; padding: 0 16px; color: var(--body); }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button[aria-pressed="true"] { background: var(--indigo); color: #fff; }
+
+  /* ---------- shared pieces ---------- */
+  .content { padding-top: 22px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 16px; border-radius: var(--sm); border: 1px solid var(--brand); background: #fff; color: var(--brand); text-decoration: none; font-size: 15px; }
+  .btn:hover { background: var(--brand-soft); }
+  .btn.pri { border-color: var(--indigo); background: var(--indigo); color: #fff; } .btn.pri:hover { background: var(--indigo-dark); }
+  .btn.sm { height: 36px; padding: 0 12px; font-size: 14px; }
+  .btn.plain { border-color: var(--line); color: #344054; } .btn.plain:hover { background: var(--panel); }
+  .btn.ind { border-color: var(--indigo); color: var(--indigo); } .btn.ind:hover { background: var(--indigo-soft); }
+  .btn.danger { border-color: var(--err); background: var(--err); color: #fff; }
+  .btn:disabled { opacity: .4; cursor: default; }
+  .search { height: 40px; flex: 1; min-width: 220px; max-width: 380px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--sm); background: #fff; }
+  .search:focus { border-color: var(--indigo); outline: none; }
+  .filter { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: var(--sm); background: #fff; font-size: 14px; }
+  .filter button { height: 38px; padding: 0 12px; border: 0; background: #fff; color: var(--body); }
+  .filter button[aria-pressed="true"] { background: var(--indigo-soft); color: var(--indigo); font-weight: 500; }
+  .filter button i { font-style: normal; margin-left: 6px; color: var(--faint); font-size: 12.5px; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+  .stats.three { grid-template-columns: repeat(3, 1fr); }
+  .stat { background: #fff; border: 1px solid var(--line); border-radius: var(--md); padding: 12px 16px; }
+  .stat span { display: block; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .stat b { font-size: 26px; font-weight: 500; line-height: 1.3; }
+  .section-title { display: flex; align-items: center; gap: 10px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--panel2); padding: 10px 16px; margin: 24px 0 14px; font-size: 13px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #444; }
+  .section-title:first-child { margin-top: 0; }
+  .section-title .av { width: 24px; height: 24px; border-radius: 50%; background: var(--indigo-soft); color: var(--indigo); display: grid; place-items: center; font-size: 10.5px; letter-spacing: 0; }
+  .section-title .meta { margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--muted); }
+  .section-title button { border: 0; background: none; color: var(--muted); text-transform: none; letter-spacing: 0; font-weight: 400; }
+  .h2 { margin: 28px 0 12px; font-size: 13px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .empty { display: none; border: 1px solid var(--line); border-radius: var(--md); background: #fff; padding: 32px; text-align: center; color: var(--body); }
+  .empty.dashed { border: 1px dashed #c9c6f5; }
+  .empty h2 { margin: 0 0 6px; font-size: 18px; font-weight: 500; color: var(--head); }
+  .toast { position: fixed; right: 24px; bottom: 84px; z-index: 30; display: flex; align-items: center; gap: 14px; background: #1f2937; color: #fff; padding: 10px 16px; border-radius: var(--sm); opacity: 0; transform: translateY(6px); transition: .2s; pointer-events: none; }
+  .toast.show { opacity: 1; transform: none; pointer-events: auto; }
+  .toast button { border: 0; background: none; color: #c7d2fe; text-decoration: underline; padding: 0; }
+  .views { display: none; } .view { display: none; } .view.active { display: block; }
+
+  /* ---------- vault (vault/page.tsx): flat grid, newest first ---------- */
+  .grid2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; list-style: none; margin: 0; padding: 0; }
+  .wf { display: flex; flex-direction: column; background: #fff; border: 1px solid var(--line); border-radius: var(--md); padding: 16px; box-shadow: 0 4px 14px rgba(16,24,40,.04); }
+  .wf-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .wf h3 { margin: 0; font-size: 16.5px; font-weight: 500; line-height: 1.35; color: var(--head); }
+  .wf .subline { margin: 4px 0 0; font-size: 13.5px; color: var(--muted); }
+  .wf .assigned { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { border-radius: var(--sm); background: var(--indigo-soft); color: var(--indigo); padding: 1px 8px; font-size: 12.5px; text-decoration: none; }
+  .chip.late { background: var(--err-soft); color: var(--err); }
+  .wtag { flex: none; border-radius: 999px; padding: 2px 10px; font-size: 12.5px; font-weight: 500; background: var(--ok-soft); color: var(--ok); }
+  .wtag.warn { background: var(--warn-soft); color: var(--warn-text); }
+  .wf-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; }
+  .wf-actions .del { margin-left: auto; border: 0; background: none; color: var(--muted); height: 36px; padding: 0 8px; border-radius: var(--sm); }
+  .wf-actions .del:hover { background: var(--err-soft); color: var(--err); }
+  .confirm { margin-top: 16px; border: 1px solid #f3c2c2; background: var(--err-soft); border-radius: var(--sm); padding: 10px 12px; color: #8e1b1b; font-size: 14px; }
+  .confirm .row { display: flex; gap: 8px; margin-top: 8px; }
+
+  /* ---------- review (review/page.tsx) ---------- */
+  ol.cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
+  .group.collapsed ol { display: none; }
+  .item { overflow: hidden; background: #fff; border: 1px solid var(--line); border-radius: var(--md); box-shadow: 0 8px 24px rgba(16,24,40,.05); display: grid; grid-template-columns: 300px minmax(0, 1fr); }
+  .shot { position: relative; min-height: 190px; border-right: 1px solid var(--line); display: grid; place-items: center; font-size: 13px; color: var(--muted); background-image: repeating-linear-gradient(135deg, #eef2f6, #eef2f6 12px, #f3f6f9 12px, #f3f6f9 24px); }
+  .shot .tg { position: absolute; left: 8px; top: 8px; border-radius: var(--sm); background: rgba(0,0,0,.6); color: #fff; padding: 2px 6px; font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .shot button { position: absolute; right: 8px; bottom: 8px; border: 0; border-radius: var(--sm); background: rgba(255,255,255,.9); color: var(--brand); padding: 3px 8px; font-size: 12px; }
+  .body { padding: 20px; display: flex; flex-direction: column; gap: 10px; }
+  .where { color: var(--muted); font-size: 13px; } .where b { color: var(--head); font-weight: 500; }
+  .label { display: block; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .note { border-radius: var(--md); background: var(--warn-soft); color: var(--warn-text); padding: 8px 12px; font-size: 14px; }
+  .decide { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; margin-top: 2px; }
+  .opt { height: 36px; padding: 0 12px; border-radius: var(--sm); border: 1px solid; background: #fff; font-size: 14px; }
+  .opt.fine { border-color: var(--ok); color: var(--ok); } .opt.fine:hover { background: var(--ok-soft); } .opt.fine[aria-pressed="true"] { background: var(--ok); color: #fff; }
+  .opt.needs { border-color: var(--err); color: var(--err); } .opt.needs:hover { background: var(--err-soft); } .opt.needs[aria-pressed="true"] { background: var(--err); color: #fff; }
+  .comment { height: 36px; min-width: 220px; flex: 1; padding: 0 8px; border: 1px solid #9aa0a6; border-radius: var(--sm); font-size: 14px; }
+  .comment:focus { border-color: var(--indigo); outline: none; }
+  .result-fine { color: var(--ok); } .result-needs { color: var(--err); }
+  .submitted { display: none; margin-top: 20px; border: 1px solid var(--ok-line); border-radius: var(--md); background: var(--ok-soft); color: var(--ok); padding: 12px 16px; }
+  .bar { display: none; position: fixed; left: 0; right: 0; bottom: 0; z-index: 15; justify-content: flex-end; align-items: center; gap: 12px; height: 64px; padding: 0 24px; background: rgba(255,255,255,.96); border-top: 1px solid var(--line); }
+  body[data-page="reviews"] .bar { display: flex; }
+  .bar span { color: var(--muted); font-size: 14px; }
+  .submit { height: 44px; padding: 0 20px; border: 0; border-radius: var(--sm); background: var(--indigo); color: #fff; }
+  .submit:hover:not(:disabled) { background: var(--indigo-dark); } .submit:disabled { opacity: .4; cursor: default; }
+
+  /* ---------- assign ---------- */
+  .assign-grid { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 7fr); gap: 20px; align-items: start; }
+  .panel { background: #fff; border: 1px solid var(--line); border-radius: var(--md); box-shadow: 0 4px 14px rgba(16,24,40,.04); }
+  .panel > h2 { display: flex; align-items: center; gap: 10px; margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--panel2); border-radius: var(--md) var(--md) 0 0; font-size: 13px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #444; }
+  .panel > h2 .meta { margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--muted); }
+  .panel .in { padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+  .field > span, .field > .lab { display: flex; align-items: center; margin-bottom: 6px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .field > .lab a, .field > .lab button { margin-left: auto; border: 0; background: none; padding: 0; text-transform: none; letter-spacing: 0; font-weight: 400; font-size: 13px; color: var(--indigo); text-decoration: none; }
+  .field select, .field input[type=date], .field textarea { width: 100%; height: 40px; padding: 0 12px; border: 1px solid #9aa0a6; border-radius: var(--sm); background: #fff; }
+  .field textarea { height: 64px; padding: 8px 12px; resize: vertical; }
+  .hint { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
+  .hint.bad { color: var(--err); }
+  .quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .quick button { height: 30px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; background: #fff; color: var(--body); font-size: 13px; }
+  .quick button:hover { background: var(--indigo-soft); color: var(--indigo); border-color: #c9c6f5; }
+  .peoplesearch { width: 100%; height: 36px; padding: 0 12px; margin-bottom: 8px; border: 1px solid var(--line); border-radius: var(--sm); }
+  .peoplesearch:focus { border-color: var(--indigo); outline: none; }
+  .people { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--sm); max-height: 232px; overflow: auto; }
+  .person { display: flex; align-items: center; gap: 10px; padding: 8px 12px; cursor: pointer; }
+  .person + .person { border-top: 1px solid var(--line); }
+  .person:hover { background: var(--panel); }
+  .person.off { cursor: default; background: var(--panel); color: var(--faint); }
+  .person input { width: 16px; height: 16px; accent-color: var(--indigo); }
+  .person .av { width: 28px; height: 28px; border-radius: 50%; background: var(--indigo-soft); color: var(--indigo); display: grid; place-items: center; font-size: 11px; font-weight: 500; flex: none; }
+  .person.off .av { background: #eef0f3; color: var(--faint); }
+  .person small { display: block; color: var(--muted); font-size: 12.5px; }
+  .person .flag { margin-left: auto; font-size: 12px; color: var(--warn-text); background: var(--warn-soft); border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+  .preview { border-radius: var(--md); background: var(--indigo-soft); color: #3b3399; padding: 10px 12px; font-size: 14px; }
+  .preview.idle { background: var(--panel2); color: var(--muted); }
+  .drafts { margin-top: 14px; border: 1px dashed #c9c6f5; border-radius: var(--md); background: #fff; padding: 10px 14px; font-size: 14px; color: var(--body); }
+  .drafts a { color: var(--indigo); }
+  .tablewrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; padding: 10px 12px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td { padding: 12px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  tr:last-child td { border-bottom: 0; }
+  tr.is-late td:first-child { box-shadow: inset 3px 0 0 var(--err); }
+  td .sm { display: block; color: var(--muted); font-size: 12.5px; }
+  td .note-t { display: block; max-width: 220px; color: var(--muted); font-size: 12.5px; font-style: italic; }
+  .due-in { height: 32px; width: 128px; padding: 0 6px; border: 1px solid transparent; border-radius: var(--sm); background: transparent; color: var(--ink); }
+  .due-in:hover, .due-in:focus { border-color: #9aa0a6; background: #fff; }
+  .due-in.late { color: var(--err); font-weight: 500; }
+  .prog { display: flex; flex-direction: column; gap: 4px; min-width: 120px; }
+  .prog .track { height: 6px; border-radius: 3px; background: #eceef1; overflow: hidden; }
+  .prog .track i { display: block; height: 100%; background: var(--indigo); }
+  .prog small { color: var(--muted); white-space: nowrap; }
+  .st { border-radius: 999px; padding: 2px 10px; font-size: 12.5px; font-weight: 500; white-space: nowrap; }
+  .st.none { background: #eef0f3; color: #475467; } .st.go { background: var(--indigo-soft); color: var(--indigo); } .st.re { background: var(--warn-soft); color: var(--warn-text); } .st.done { background: var(--ok-soft); color: var(--ok); } .st.late { background: var(--err-soft); color: var(--err); }
+  .rowact { display: flex; flex-direction: column; align-items: flex-end; gap: 0; white-space: nowrap; }
+  .link { border: 0; background: none; color: var(--muted); padding: 4px 8px; border-radius: var(--sm); font-size: 13.5px; text-decoration: none; }
+  .link:hover { color: var(--indigo); background: var(--indigo-soft); } .link.rm:hover { color: var(--err); background: var(--err-soft); }
+  .link:disabled { opacity: .35; cursor: default; background: none; color: var(--muted); }
+  .tfilters { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  .tfilters select { height: 38px; margin-left: auto; font-size: 14px; }
+
+  /* ---------- process map (process/page.tsx + ProcessDiagram.tsx) ---------- */
+  .tiles { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-top: 24px; }
+  .tile2 { border: 1px solid var(--line); border-radius: var(--md); background: rgba(255,255,255,.8); padding: 12px 16px; }
+  .tile2 b { display: block; font-size: 28px; font-weight: 300; line-height: 1; color: var(--head); }
+  .tile2 span { display: block; margin-top: 6px; font-size: 13px; color: var(--body); }
+  .pd { overflow-x: auto; margin-bottom: 8px; border: 1px solid var(--line); border-radius: var(--md); background: #fff; }
+  .pd-in { position: relative; }
+  .lane { position: absolute; left: 0; right: 0; }
+  .lane.alt { background: #fafbfd; } .lane + .lane, .lane.first { border-top: 1px solid var(--line); }
+  .lane .lbl { position: absolute; top: 0; bottom: 0; left: 0; display: flex; align-items: center; justify-content: center; border-right: 1px solid var(--line); background: #f6f8fc; }
+  .lane .lbl i { position: absolute; top: 0; bottom: 0; left: 0; width: 4px; }
+  .lane .lbl span { max-height: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; font-weight: 700; color: #344054; writing-mode: vertical-rl; transform: rotate(180deg); }
+  .pd svg { position: absolute; inset: 0; pointer-events: none; }
+  .pd svg text { font-size: 11.5px; font-weight: 700; fill: #344054; }
+  .pill-n { position: absolute; display: grid; place-items: center; border-radius: var(--sm); background: #2b2f45; color: #fff; font-size: 14px; font-weight: 700; }
+  .rule { position: absolute; display: flex; flex-direction: column; align-items: center; text-decoration: none; color: inherit; }
+  .rule .dia { display: grid; place-items: center; }
+  .rule .dia div { display: grid; place-items: center; width: 46px; height: 46px; transform: rotate(45deg); border-radius: 3px; background: #2b2f45; box-shadow: 0 1px 2px rgba(16,24,40,.2); }
+  .rule .dia span { transform: rotate(-45deg); font-size: 11px; font-weight: 700; color: #fff; }
+  .rule:hover .dia div { background: var(--indigo); }
+  .rule p { margin: 4px 0 0; text-align: center; font-size: 11.5px; line-height: 1.35; color: #344054; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .sbox { position: absolute; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--line); border-radius: var(--md); background: #fff; box-shadow: 0 2px 6px rgba(16,24,40,.08); text-decoration: none; color: inherit; transition: transform .15s, box-shadow .15s; }
+  .sbox:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(16,24,40,.12); }
+  .sbox .h { display: flex; gap: 8px; align-items: flex-start; padding: 8px 12px; color: #fff; }
+  .sbox .h em { flex: none; display: grid; place-items: center; width: 20px; height: 20px; margin-top: 1px; border-radius: 50%; background: rgba(255,255,255,.25); font-size: 11px; font-weight: 700; font-style: normal; }
+  .sbox .h strong { font-size: 13.5px; font-weight: 500; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .sbox .b { flex: 1; display: flex; flex-direction: column; gap: 4px; padding: 8px 12px; font-size: 12px; line-height: 1.35; color: var(--body); min-height: 0; }
+  .sbox .b p { margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .sbox .b b { color: #344054; }
+  .sbox .badges { margin-top: auto; display: flex; gap: 6px; }
+  .sbox .badges span { border-radius: var(--sm); padding: 0 6px; font-size: 11px; font-weight: 700; }
+  .sbox .badges .r { background: var(--indigo-soft); color: var(--indigo); } .sbox .badges .q { background: var(--warn-soft); color: var(--warn-text); }
+  .legend { display: flex; flex-wrap: wrap; gap: 18px; margin: 0 0 24px; font-size: 12.5px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend .sw { width: 14px; height: 14px; border-radius: 2px; background: #2b2f45; } .legend .sw.d { transform: rotate(45deg) scale(.8); }
+  .legend .ln { width: 22px; border-top: 2px solid #667085; } .legend .ln.dash { border-top: 2px dashed #5146d9; }
+  .steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+  .steps > li { position: relative; padding: 0 0 20px 40px; }
+  .steps > li:not(:last-child)::before { content: ""; position: absolute; left: 13px; top: 32px; bottom: 0; width: 2px; background: #d0d5dd; }
+  .steps .num { position: absolute; left: 0; top: 4px; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; color: #fff; font-size: 13px; font-weight: 700; }
+  .steps .card { scroll-margin-top: 130px; border: 1px solid var(--line); border-radius: var(--md); background: #fff; padding: 16px; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
+  .steps .card:target { border-color: var(--indigo); box-shadow: 0 0 0 3px var(--indigo-soft); }
+  .steps .ttl { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; font-size: 16.5px; line-height: 1.35; color: var(--head); }
+  .steps .ttl span:first-child { flex: 1; min-width: 0; }
+  .steps .time { border-radius: 999px; background: #f2f4f7; padding: 2px 10px; font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--body); }
+  .tool { display: inline-block; margin-top: 6px; border-radius: var(--sm); padding: 0 8px; font-size: 12px; font-weight: 500; color: #fff; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; font-size: 14px; }
+  .two h4 { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+  .two ul { margin: 4px 0 0; padding: 0; list-style: none; color: #344054; } .two li span { color: var(--muted); } .two li.none { color: var(--faint); }
+  .two a { color: var(--indigo); }
+  .decision { margin-top: 12px; border-radius: var(--md); background: rgba(241,240,255,.7); padding: 8px 12px; font-size: 14px; } .decision b { color: var(--indigo); }
+  .ruleline { margin-top: 8px; font-size: 14px; color: #344054; }
+  .ask { margin-top: 12px; border: 1px solid #f2d48a; border-radius: var(--md); background: var(--warn-soft); padding: 8px 12px; font-size: 13.5px; color: var(--warn-text); } .ask ul { margin: 4px 0 0; padding-left: 20px; }
+  .built { margin-top: 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; font-size: 13px; color: var(--muted); }
+  .built .btn { height: 44px; }
+
+  /* ---------- training (teach/page.tsx): what the new hire sees ---------- */
+  .asg { display: flex; flex-direction: column; gap: 12px; list-style: none; margin: 0; padding: 0; }
+  .asg li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; background: #fff; border: 1px solid var(--line); border-left: 4px solid var(--indigo); border-radius: var(--md); padding: 16px; box-shadow: 0 4px 14px rgba(16,24,40,.04); }
+  .asg li.late { border-left-color: var(--err); } .asg li.done { border-left-color: var(--ok); }
+  .asg h3 { margin: 0; font-size: 17px; font-weight: 500; color: var(--head); }
+  .asg .meta { margin: 2px 0 8px; font-size: 13.5px; color: var(--muted); }
+  .asg .from { margin: 0 0 10px; border-radius: var(--md); background: var(--indigo-soft); color: #3b3399; padding: 6px 10px; font-size: 14px; }
+  .asg .prog { max-width: 360px; }
+  .asg .go { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+
+  @media (max-width: 960px) {
+    .item { grid-template-columns: 1fr; } .shot { border-right: 0; border-bottom: 1px solid var(--line); }
+    .stats, .stats.three { grid-template-columns: repeat(2, 1fr); } h1 { font-size: 32px; }
+    .grid2, .assign-grid { grid-template-columns: minmax(0, 1fr); } .tiles { grid-template-columns: repeat(2, 1fr); } .two { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 720px) {
+    .asg li { grid-template-columns: 1fr; } .asg .go { align-items: flex-start; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+  /* ---------- review card: screenshot | new hire vs expert | decision (from the draw.io sketch) ---------- */
+  .ghead { display: flex; align-items: center; gap: 12px; margin: 22px 0 12px; padding: 10px 16px; border: 1px solid #bcd8f5; border-radius: var(--md); background: var(--brand-soft); color: var(--head); font-size: 15px; font-weight: 500; }
+  .ghead:first-child { margin-top: 0; }
+  .ghead .av { width: 30px; height: 30px; border-radius: 50%; background: #fff; color: var(--head); display: grid; place-items: center; font-size: 11.5px; font-weight: 700; }
+  .ghead button { margin-left: auto; border: 0; background: none; color: var(--body); font-size: 14px; }
+  .item { grid-template-columns: 232px minmax(0, 1fr) 280px; align-items: stretch; box-shadow: 0 4px 14px rgba(16,24,40,.04); }
+  .item .shotcol { padding: 16px 0 16px 16px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .item .shot { width: 100%; flex: 1; min-height: 150px; border: 1px solid #cbd5e1; border-radius: var(--md); }
+  .item .shot .tg { left: auto; right: auto; top: auto; left: 8px; bottom: 8px; font-size: 12px; padding: 2px 8px; }
+  .item .shotcol a { font-size: 13px; color: var(--brand); text-decoration: none; } .item .shotcol a:hover { text-decoration: underline; }
+  .item .mid { padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .item .where { font-size: 15px; color: var(--head); } .item .where b { font-weight: 500; }
+  .item .where small { display: block; margin-top: 2px; font-size: 13px; color: var(--faint); }
+  .cmp { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; flex: 1; }
+  .cmp > div { border: 1px solid var(--line); border-radius: var(--md); padding: 10px 14px; background: #fff; font-size: 15px; line-height: 1.45; }
+  .cmp > div.exp { background: var(--indigo-soft); border-color: #dcd9fb; }
+  .cmp .label { margin-bottom: 4px; }
+  .item .qn { margin: 0; font-size: 13.5px; font-style: italic; color: var(--muted); }
+  .item .side { padding: 16px; display: flex; flex-direction: column; gap: 10px; border-left: 1px solid var(--line); }
+  .state { align-self: flex-start; border-radius: 999px; padding: 3px 12px; font-size: 13px; font-weight: 500; background: var(--warn-soft); color: var(--warn-text); }
+  .state.fine { background: var(--ok-soft); color: var(--ok); } .state.needs { background: var(--err-soft); color: var(--err); }
+  .side .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .side .opt { height: 40px; padding: 0 8px; font-size: 14px; font-weight: 500; white-space: nowrap; }
+  .side .comment { height: auto; min-height: 64px; width: 100%; padding: 8px 10px; resize: vertical; }
+  .side .done-t { margin: 0; font-size: 14px; color: var(--body); }
+  @media (max-width: 1180px) {
+    .item { grid-template-columns: 200px minmax(0, 1fr); } .item .side { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--line); }
+  }
+  @media (max-width: 720px) {
+    .item { grid-template-columns: 1fr; } .item .shotcol { padding: 16px 16px 0; } .cmp { grid-template-columns: 1fr; }
+  }
+
+  /* ---------- permissions ---------- */
+  .deny { max-width: 520px; margin: 56px auto; text-align: center; background: #fff; border: 1px solid var(--line); border-radius: var(--md); padding: 36px 28px; box-shadow: 0 4px 14px rgba(16,24,40,.04); }
+  .deny .lock { width: 48px; height: 48px; margin: 0 auto 14px; border-radius: 50%; background: var(--indigo-soft); color: var(--indigo); display: grid; place-items: center; }
+  .deny p { margin: 0 0 16px; font-size: 16px; color: var(--head); }
+  .bar.none { display: none !important; }
+  .ws .role { display: inline-block; margin: 4px 0 0; border-radius: 999px; padding: 0 8px; font-size: 12px; font-weight: 500; background: var(--indigo-soft); color: var(--indigo); }
+  .ws .sk { display: block; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #c9ccd1; font-size: 11.5px; color: var(--muted); }
+  .ws .sk select { width: 100%; height: 34px; margin-top: 4px; font-size: 13px; padding: 0 6px; }
+</style>
+</head>
+<body data-page="workflows">
+
+<aside class="sidebar">
+  <a class="brand" href="#workflows" aria-label="Torchbearer"><span class="tile"><svg width="22" height="22" viewBox="0 0 64 64" aria-hidden="true"><rect x="10" y="16" width="44" height="34" rx="12" fill="#fff"/><circle cx="24" cy="33" r="5" fill="#5146d9"/><circle cx="40" cy="33" r="5" fill="#5146d9"/><path d="M25 43c4 3 10 3 14 0" stroke="#5146d9" stroke-width="3" stroke-linecap="round" fill="none"/><path d="M32 16V9" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg></span><b>Torchbearer</b></a>
+  <div class="nav-label">Workflows</div>
+  <nav class="nav" aria-label="Main">
+    <a href="#workflows" data-nav="workflows"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span>Workflows</span></a>
+    <a href="#reviews" data-nav="reviews"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg><span>Reviews</span><b class="count" id="navCount">7</b></a>
+    <a href="#assign" data-nav="assign"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Assign</span></a>
+  </nav>
+  <div class="nav-label" style="margin-top:22px">Module</div>
+  <nav class="nav" aria-label="Modules">
+    <a href="#training" data-nav="training"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6l8-3 8 3-8 3-8-3z"/><path d="M7 10.5V15c0 1.5 2.5 3 5 3s5-1.5 5-3v-4.5"/></svg><span>Training</span></a>
+  </nav>
+  <div class="ws"><b id="meName"></b><div class="em" id="meEmail"></div><span class="role" id="meRole"></span><br><a href="#" data-toast="Signs out">Sign out</a>
+    <label class="sk">Viewing as (sketch only)<select id="meSel"></select></label></div>
+</aside>
+
+<div class="shell">
+
+  <!-- ================= vault ================= -->
+  <section class="view" id="view-workflows">
+    <div class="wrap"><div class="head"><h1>Workflows</h1><div class="tools">
+      <input class="search" id="wfQuery" placeholder="Search by workflow or expert" aria-label="Search workflows">
+      <div class="filter" role="group" aria-label="Filter" id="wfFilter"><button data-f="all" aria-pressed="true">All</button><button data-f="approved" aria-pressed="false">Ready to teach</button><button data-f="draft" aria-pressed="false">Needs approval</button></div>
+      <a class="btn pri" href="#" data-toast="Opens the recorder">● Record a new workflow</a></div></div></div>
+    <div class="wrap content">
+      <section class="stats three" aria-label="Summary">
+        <div class="stat"><span>Workflows</span><b id="vTotal">0</b></div>
+        <div class="stat"><span>Ready to teach</span><b id="vReady" style="color:var(--ok)">0</b></div>
+        <div class="stat"><span>Needs approval</span><b id="vDraft" style="color:var(--warn-text)">0</b></div>
+      </section>
+      <ul class="grid2" id="wfList"></ul>
+      <div class="empty" id="wfEmpty">No workflows match.</div>
+      <div class="empty dashed" id="wfNone"><h2>No workflows yet</h2><p id="wfNoneText"></p><a class="btn pri" href="#" data-toast="Opens the recorder">Record the first workflow</a></div>
+    </div>
+  </section>
+
+  <!-- ================= review ================= -->
+  <section class="view" id="view-reviews">
+    <div class="wrap"><div class="head"><h1>Reviews</h1><div class="tools">
+      <select id="fLearner" aria-label="Learner"><option value="">All learners</option></select>
+      <select id="fWorkflow" aria-label="Workflow"><option value="">All workflows</option></select>
+      <div class="seg" role="group" aria-label="Show"><button data-view="all" aria-pressed="true">All</button><button data-view="open" aria-pressed="false">Undecided</button><button data-view="done" aria-pressed="false">Decided</button></div></div></div></div>
+    <div class="wrap content">
+      <section class="stats three" aria-label="Summary">
+        <div class="stat"><span>Under review</span><b id="sOpen" style="color:var(--warn-text)">0</b></div>
+        <div class="stat"><span>Fine as it is</span><b id="sFine" style="color:var(--ok)">0</b></div>
+        <div class="stat"><span>Needs correction</span><b id="sNeeds" style="color:var(--err)">0</b></div>
+      </section>
+      <div id="list"></div>
+      <div class="empty" id="empty">Nothing under review yet. Items appear here when the new hire practises in Training.</div>
+      <p class="submitted" id="submitted">Review submitted. Steps marked fine count as learned; the rest stay on the new hire&rsquo;s relearn list for their next practice.</p>
+    </div>
+  </section>
+
+  <!-- ================= assign ================= -->
+  <section class="view" id="view-assign">
+    <div class="wrap"><div class="head"><h1>Assign</h1></div></div>
+    <div class="wrap" id="asDenied" style="display:none"><div class="deny"><div class="lock"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg></div><p>You lack access to assign workflows to other employees.</p></div></div>
+    <div class="wrap content" id="asContent">
+      <section class="stats" aria-label="Assignment summary">
+        <div class="stat"><span>Active</span><b id="aActive">0</b></div>
+        <div class="stat"><span>Overdue</span><b id="aLate" style="color:var(--err)">0</b></div>
+        <div class="stat"><span>Needs relearn</span><b id="aRe" style="color:var(--warn-text)">0</b></div>
+        <div class="stat"><span>Done</span><b id="aDone" style="color:var(--ok)">0</b></div>
+      </section>
+      <div class="assign-grid">
+        <div>
+          <div class="panel">
+            <h2>New assignment</h2>
+            <div class="in">
+              <label class="field"><span>1 · Workflow</span><select id="asWorkflow"></select><p class="hint" id="asWfHint"></p></label>
+              <div class="field">
+                <div class="lab">2 · Who should learn it<button id="asAll" type="button">Select everyone free</button></div>
+                <input class="peoplesearch" id="asSearch" placeholder="Search new hires" aria-label="Search new hires">
+                <div class="people" id="asPeople"></div>
+              </div>
+              <div class="field"><label for="asDue" class="lab">3 · Finish by (optional)</label><input type="date" id="asDue">
+                <div class="quick"><button type="button" data-days="7">In 1 week</button><button type="button" data-days="14">In 2 weeks</button><button type="button" data-days="30">In a month</button><button type="button" data-days="0">No date</button></div>
+                <p class="hint bad" id="asDueBad" style="display:none">That date has already passed.</p></div>
+              <label class="field"><span>Note for the new hire (optional)</span><textarea id="asNote" placeholder="e.g. Start with the receipt rules"></textarea></label>
+              <div class="preview idle" id="asPreview">Choose a workflow and at least one new hire.</div>
+              <button class="btn pri" id="asGo" disabled>Assign</button>
+            </div>
+          </div>
+          <p class="drafts" id="asDrafts"></p>
+        </div>
+        <div class="panel">
+          <h2>Current assignments <span class="meta" id="asCount"></span></h2>
+          <div class="tfilters">
+            <div class="filter" role="group" aria-label="Status" id="asFilter"></div>
+            <select id="asWf" aria-label="Workflow"><option value="">All workflows</option></select>
+          </div>
+          <div class="tablewrap"><table><thead><tr><th>New hire</th><th>Finish by</th><th>Progress</th><th>Status</th><th></th></tr></thead><tbody id="asRows"></tbody></table></div>
+          <div class="empty" id="asEmpty" style="border:0">No assignments yet. Pick a workflow and a new hire on the left.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= process map ================= -->
+  <section class="view" id="view-process">
+    <div class="wrap"><div class="crumbs"><a href="#workflows">← Workflows</a><a href="#" data-toast="Opens the Work Map">Work Map</a><a href="#process" id="pmLink" data-deeplink="w4" style="display:none;color:var(--indigo)">Sketch only: open a link to a colleague&rsquo;s workflow</a><select id="pmSelect" aria-label="Workflow"></select></div>
+      <div class="deny" id="pmDenied" style="display:none"><div class="lock"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg></div><p>You lack permission to edit or review this workflow.</p><a class="btn" href="#workflows">← Back to Workflows</a></div>
+      <div class="head" id="pmHead"><h1 id="pmName">Meal expense report</h1><div class="built"><span>Built Nov 4, 2026, 9:12 AM</span><button class="btn pri" data-toast="Builds the process map from the recording (about a minute)">Rebuild process map</button></div></div></div>
+    <div class="wrap content" id="pmContent">
+      <div class="tiles" id="pmTiles" style="margin:0 0 4px"></div>
+      <h2 class="h2">Process diagram</h2>
+      <div class="pd" id="pdBox"></div>
+      <div class="legend" aria-label="Legend">
+        <span><i class="sw"></i> Start / End</span><span><i class="sw d"></i> Rule or decision before a step</span>
+        <span><i class="ln"></i> Flow, with how long the step took</span><span><i class="ln dash"></i> Output used by a later step</span>
+      </div>
+      <h2 class="h2">Step details</h2>
+      <ol class="steps" id="pmSteps"></ol>
+      <h2 class="h2">Data flow</h2>
+      <div class="pd"><div class="tablewrap"><table><thead><tr><th>Data or document</th><th>Comes from</th><th>Used in</th></tr></thead><tbody id="pmData"></tbody></table></div></div>
+    </div>
+  </section>
+
+  <!-- ================= training (the new hire's side of Assign) ================= -->
+  <section class="view" id="view-training">
+    <div class="wrap"><div class="head"><h1>Training</h1><div class="tools"><span style="font-size:13px;color:var(--muted)">Sketch only · preview as</span><select id="trWho" aria-label="Preview as a new hire"></select></div></div></div>
+    <div class="wrap content">
+      <h2 class="h2" style="margin-top:4px">Assigned to you</h2>
+      <ul class="asg" id="trMine"></ul>
+      <div class="empty" id="trNone">Nothing assigned yet. Your supervisor will give you a workflow here.</div>
+    </div>
+  </section>
+
+</div>
+
+<div class="bar">
+  <span id="decidedText">0/7 decided</span>
+  <button class="submit" id="submit" disabled>Submit review</button>
+</div>
+<div class="toast" id="toast" role="status"><span id="toastText"></span><button id="toastUndo" style="display:none">Undo</button></div>
+
+<script>
+// ================= shared =================
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const initials = (n) => n.split(" ").map((p) => p[0]).join("");
+const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+const TODAY = "2026-11-12"; // fixed so the sketch always looks the same
+const iso = (d) => d.toISOString().slice(0, 10);
+const plusDays = (n) => { const d = new Date(TODAY + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return iso(d); };
+const dshort = (i) => i ? new Date(i + "T00:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }) : "";
+let toastT, undoFn;
+function toast(m, undo) {
+  $("#toastText").textContent = m; undoFn = undo; $("#toastUndo").style.display = undo ? "" : "none";
+  $("#toast").classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => $("#toast").classList.remove("show"), undo ? 5000 : 1900);
+}
+$("#toastUndo").addEventListener("click", () => { if (undoFn) undoFn(); undoFn = null; $("#toast").classList.remove("show"); });
+
+// ================= data =================
+// Workflows: like the product's vault, newest first. dateIso lets us sort.
+const workflows = [
+  { id: "w5", name: "Release checklist", expert: "Marcus Lee", steps: 14, dateIso: "2026-11-09", published: false },
+  { id: "w3", name: "Quarterly access review", expert: "Sarah Chen", steps: 8, dateIso: "2026-11-08", published: false },
+  { id: "w1", name: "Meal expense report", expert: "Sarah Chen", steps: 8, dateIso: "2026-11-03", published: true },
+  { id: "w6", name: "Customer feedback loop", expert: "Priya Nair", steps: 7, dateIso: "2026-11-01", published: true },
+  { id: "w2", name: "Vendor onboarding", expert: "Sarah Chen", steps: 9, dateIso: "2026-10-28", published: true },
+  { id: "w4", name: "Incident response", expert: "Marcus Lee", steps: 10, dateIso: "2026-10-21", published: true },
+];
+// Sketch-only: who is "signed in". In the product the role comes from the server (see permissions.md).
+const USERS = [
+  { name: "Morgan Diaz", email: "demo.supervisor@example.com", role: "manager" },
+  { name: "Jamie Cole", email: "jamie.cole@example.com", role: "admin" },
+  { name: "Sarah Chen", email: "sarah.chen@example.com", role: "employee" },
+  { name: "Priya Nair", email: "priya.nair@example.com", role: "employee" },
+  { name: "Marcus Lee", email: "marcus.lee@example.com", role: "employee" },
+  { name: "Alex Kim", email: "alex.kim@example.com", role: "employee" },
+];
+let me = USERS[0];
+const isMgr = () => me.role !== "employee";
+const mineW = (w) => w.expert === me.name;                       // owner = who recorded it
+const visibleWorkflows = () => (isMgr() ? workflows : workflows.filter(mineW));
+const canOpen = (id) => { const w = wfById(id); return !!w && (isMgr() || mineW(w)); };
+const canSee = (i) => isMgr() || ((workflows.find((w) => w.name === i.workflow) || {}).expert === me.name); // reviews go to the recorder
+const ROLE = { manager: "Manager", admin: "Admin", employee: "Employee" };
+const learners = ["Alex Kim", "Jordan Patel", "Sam Rivera", "Dana Ortiz", "Lee Wong"];
+const assignments = [
+  { id: 1, learner: "Alex Kim", wid: "w1", due: "2026-11-20", note: "Start with the receipt rules", learned: 5, relearn: 1 },
+  { id: 2, learner: "Jordan Patel", wid: "w2", due: "2026-11-18", note: "", learned: 4, relearn: 2 },
+  { id: 3, learner: "Sam Rivera", wid: "w1", due: "2026-11-10", note: "Please finish before the audit.", learned: 0, relearn: 0 },
+  { id: 4, learner: "Dana Ortiz", wid: "w4", due: "2026-11-12", note: "", learned: 10, relearn: 0 },
+  { id: 5, learner: "Alex Kim", wid: "w6", due: "", note: "", learned: 0, relearn: 0 },
+];
+let nextId = 6;
+const wfById = (id) => workflows.find((w) => w.id === id);
+const wname = (id) => (wfById(id) || {}).name || "Deleted workflow";
+const wsteps = (id) => (wfById(id) || {}).steps || 1;
+const RANK = { late: 0, re: 1, go: 2, none: 3, done: 4 };
+function statusOf(a) {
+  if (a.learned >= wsteps(a.wid)) return ["done", "Done"];
+  if (a.due && a.due < TODAY) return ["late", "Overdue"];
+  if (a.relearn) return ["re", "Needs relearn"];
+  return a.learned ? ["go", "In progress"] : ["none", "Not started"];
+}
+const active = (list = assignments) => list.filter((a) => statusOf(a)[0] !== "done");
+const dueText = (a) => { if (!a.due) return "No date"; const d = Math.round((new Date(a.due) - new Date(TODAY)) / 864e5); return d < 0 ? `${-d} day${d === -1 ? "" : "s"} overdue` : d === 0 ? "Due today" : d === 1 ? "Due tomorrow" : `Due in ${d} days`; };
+
+// ================= vault =================
+const wf = { q: "", f: "all", confirming: null, error: false };
+function renderWorkflows() {
+  const mgr = isMgr(), vis = visibleWorkflows(), ready = vis.filter((w) => w.published).length;
+  $("#vTotal").textContent = vis.length; $("#vReady").textContent = ready; $("#vDraft").textContent = vis.length - ready;
+  $("#wfQuery").placeholder = mgr ? "Search by workflow or expert" : "Search your workflows";
+  $("#wfNoneText").textContent = mgr ? "Ask an experienced colleague to record a task they know well. Torchbearer watches, asks whenever something isn\u2019t clear, and turns it into a Work Map you can teach from." : "Workflows you record appear here. Record a task you know well and Torchbearer turns it into a Work Map.";
+  const q = wf.q.trim().toLowerCase();
+  const shown = vis.filter((w) => (wf.f === "all" || (wf.f === "approved") === w.published) && (!q || w.name.toLowerCase().includes(q) || (mgr && w.expert.toLowerCase().includes(q))))
+    .sort((a, b) => (a.dateIso < b.dateIso ? 1 : -1));
+  $("#wfNone").style.display = vis.length ? "none" : "block";
+  $("#wfEmpty").style.display = vis.length && !shown.length ? "block" : "none";
+  $("#wfList").innerHTML = shown.map((w) => {
+    const as = active(assignments.filter((a) => a.wid === w.id));
+    const late = as.filter((a) => statusOf(a)[0] === "late").length;
+    const actions = mgr
+      ? `${w.published
+          ? `<a class="btn sm pri" href="#assign" data-assign="${w.id}">Train a new hire</a><a class="btn sm plain" href="#" data-toast="Opens the Work Map">View Work Map</a>`
+          : `<button class="btn sm ind" data-approve="${w.id}">Review and approve</button>`}
+        <a class="btn sm plain" href="#process" data-process="${w.id}">Process map</a>
+        <button class="del" data-ask="${w.id}" aria-label="Delete ${esc(w.name)}">Delete</button>`
+      : `${w.published ? `<button class="btn sm pri" data-toast="Asks a manager to assign this workflow (placeholder, see permissions.md)">Train a new hire</button>` : ""}
+        <a class="btn sm plain" href="#" data-toast="Opens the Work Map">View Work Map</a>
+        <a class="btn sm plain" href="#process" data-process="${w.id}">Process map</a>`;
+    return `<li class="wf">
+      <div class="wf-top"><h3>${esc(w.name)}</h3><span class="wtag ${w.published ? "" : "warn"}">${w.published ? "Ready to teach" : "Needs approval"}</span></div>
+      <p class="subline">${plural(w.steps, "step")} · ${mgr ? `taught by ${esc(w.expert)}` : "recorded by you"} · ${esc(new Date(w.dateIso + "T00:00:00Z").toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" }))}</p>
+      ${mgr && as.length ? `<div class="assigned"><a class="chip" href="#assign" data-assign-filter="${w.id}">${as.length} learning it</a>${late ? `<a class="chip late" href="#assign" data-assign-filter="${w.id}">${late} overdue</a>` : ""}</div>` : ""}
+      ${mgr && wf.confirming === w.id ? `<div class="confirm" role="alert">Delete &ldquo;${esc(w.name)}&rdquo;? This can&rsquo;t be undone.${as.length ? ` It also removes ${plural(as.length, "assignment")}.` : ""}${wf.error ? `<div>Couldn&rsquo;t delete it. Please try again.</div>` : ""}<div class="row"><button class="btn sm danger" data-del="${w.id}">Delete</button><button class="btn sm plain" data-cancel>Cancel</button></div></div>` : `<div class="wf-actions">${actions}</div>`}
+    </li>`;
+  }).join("");
+}
+$("#wfQuery").addEventListener("input", (e) => { wf.q = e.target.value; renderWorkflows(); });
+
+// ================= assign =================
+const as = { wid: "", picked: new Set(), q: "", status: "all", wfilter: "" };
+function renderAssign() {
+  $("#asDenied").style.display = isMgr() ? "none" : ""; $("#asContent").style.display = isMgr() ? "" : "none";
+  if (!isMgr()) return;
+  const ready = workflows.filter((w) => w.published);
+  const sel = $("#asWorkflow");
+  sel.innerHTML = `<option value="">Choose a workflow…</option>` + ready.map((w) => `<option value="${w.id}">${esc(w.name)} · ${plural(w.steps, "step")}</option>`).join("");
+  if (as.wid && !ready.some((w) => w.id === as.wid)) as.wid = "";
+  sel.value = as.wid;
+  const w = wfById(as.wid);
+  $("#asWfHint").textContent = w ? `Taught by ${w.expert}. ${plural(active(assignments.filter((a) => a.wid === w.id)).length, "new hire")} learning it now.` : "";
+
+  // people: search, disable anyone who already has this workflow in progress
+  const q = as.q.trim().toLowerCase();
+  const has = (name) => as.wid && assignments.some((a) => a.learner === name && a.wid === as.wid && statusOf(a)[0] !== "done");
+  as.picked.forEach((n) => { if (has(n)) as.picked.delete(n); });
+  const shownP = learners.filter((n) => !q || n.toLowerCase().includes(q));
+  $("#asPeople").innerHTML = shownP.length ? shownP.map((n) => {
+    const k = active(assignments.filter((a) => a.learner === n)).length, off = has(n);
+    return `<label class="person ${off ? "off" : ""}"><input type="checkbox" data-p="${esc(n)}" ${as.picked.has(n) ? "checked" : ""} ${off ? "disabled" : ""}><span class="av">${initials(n)}</span><span>${esc(n)}<small>${k ? plural(k, "workflow") + " in progress" : "Nothing in progress"}</small></span>${off ? `<span class="flag">Already has it</span>` : ""}</label>`;
+  }).join("") : `<div class="person off">No new hire matches.</div>`;
+  $("#asAll").style.display = as.wid ? "" : "none";
+
+  // due date
+  const due = $("#asDue").value, bad = !!due && due < TODAY;
+  $("#asDue").min = TODAY; $("#asDueBad").style.display = bad ? "" : "none";
+
+  // preview + button
+  const n = as.picked.size, names = [...as.picked];
+  const who = n === 1 ? names[0] : n === 2 ? names.join(" and ") : `${names[0]} and ${n - 1} others`;
+  const pv = $("#asPreview");
+  pv.className = "preview" + (w && n ? "" : " idle");
+  pv.innerHTML = w && n ? `${esc(who)} will find <b>${esc(w.name)}</b> first in Training${due && !bad ? `, to finish by <b>${dshort(due)}</b>` : ""}.${$("#asNote").value.trim() ? " Your note comes with it." : ""}` : "Choose a workflow and at least one new hire.";
+  $("#asGo").disabled = !w || !n || bad;
+  $("#asGo").textContent = n > 1 ? `Assign to ${n} new hires` : "Assign";
+
+  // drafts hint
+  const drafts = workflows.filter((x) => !x.published).length;
+  $("#asDrafts").style.display = drafts ? "" : "none";
+  $("#asDrafts").innerHTML = `${plural(drafts, "workflow")} ${drafts === 1 ? "isn&rsquo;t" : "aren&rsquo;t"} ready to teach yet, so ${drafts === 1 ? "it isn&rsquo;t" : "they aren&rsquo;t"} listed. <a href="#workflows" data-f-draft>Review and approve ${drafts === 1 ? "it" : "them"}</a>.`;
+
+  // stats + hero
+  const act = active(), lateN = assignments.filter((a) => statusOf(a)[0] === "late").length, reN = assignments.filter((a) => statusOf(a)[0] === "re").length;
+  $("#aActive").textContent = act.length; $("#aLate").textContent = lateN; $("#aRe").textContent = reN; $("#aDone").textContent = assignments.length - act.length;
+
+  // table filters
+  const counts = { all: assignments.length };
+  assignments.forEach((a) => { const k = statusOf(a)[0]; counts[k] = (counts[k] || 0) + 1; });
+  $("#asFilter").innerHTML = [["all", "All"], ["late", "Overdue"], ["re", "Needs relearn"], ["go", "In progress"], ["none", "Not started"], ["done", "Done"]]
+    .filter(([k]) => k === "all" || counts[k]).map(([k, l]) => `<button data-st="${k}" aria-pressed="${as.status === k}">${l}<i>${counts[k] || 0}</i></button>`).join("");
+  const wsel = $("#asWf"); wsel.innerHTML = `<option value="">All workflows</option>` + [...new Set(assignments.map((a) => a.wid))].map((id) => `<option value="${id}">${esc(wname(id))}</option>`).join(""); wsel.value = as.wfilter;
+
+  const rows = assignments.filter((a) => (as.status === "all" || statusOf(a)[0] === as.status) && (!as.wfilter || a.wid === as.wfilter))
+    .sort((a, b) => RANK[statusOf(a)[0]] - RANK[statusOf(b)[0]] || (a.due || "9").localeCompare(b.due || "9"));
+  $("#asCount").textContent = rows.length === assignments.length ? plural(assignments.length, "assignment") : `${rows.length} of ${assignments.length}`;
+  $("#asEmpty").style.display = rows.length ? "none" : "block";
+  $("#asEmpty").textContent = assignments.length ? "Nothing matches this filter." : "No assignments yet. Pick a workflow and a new hire on the left.";
+  const undecided = (name) => items.filter((i) => i.learner === name && !i.decision).length;
+  $("#asRows").innerHTML = rows.map((a) => {
+    const nn = wsteps(a.wid), [cls, label] = statusOf(a), done = cls === "done", u = undecided(a.learner);
+    return `<tr class="${cls === "late" ? "is-late" : ""}"><td><b style="font-weight:500">${esc(a.learner)}</b><span class="sm">${esc(wname(a.wid))}</span>${a.note ? `<span class="note-t" title="${esc(a.note)}">&ldquo;${esc(a.note)}&rdquo;</span>` : ""}</td>
+      <td>${done ? `<span class="sm">${a.due ? dshort(a.due) : "–"}</span>` : `<input class="due-in ${cls === "late" ? "late" : ""}" type="date" data-due="${a.id}" value="${a.due}" aria-label="Finish by"><span class="sm">${dueText(a)}</span>`}</td>
+      <td><div class="prog"><div class="track"><i style="width:${Math.min(100, Math.round(a.learned / nn * 100))}%"></i></div><small>${a.learned}/${nn} learned${a.relearn ? " · " + a.relearn + " to relearn" : ""}</small></div></td>
+      <td><span class="st ${cls}">${label}</span></td>
+      <td><div class="rowact">${u ? `<a class="link" href="#reviews" data-review="${esc(a.learner)}">${u} to review</a>` : ""}${done ? "" : `<button class="link" data-nudge="${a.id}">Remind</button>`}<button class="link rm" data-rm="${a.id}" aria-label="Remove assignment">Remove</button></div></td></tr>`;
+  }).join("");
+}
+document.addEventListener("change", (e) => {
+  const t = e.target;
+  if (t.matches("[data-p]")) { t.checked ? as.picked.add(t.dataset.p) : as.picked.delete(t.dataset.p); renderAssign(); }
+  else if (t.id === "asWorkflow") { as.wid = t.value; renderAssign(); }
+  else if (t.id === "asDue") renderAssign();
+  else if (t.id === "asWf") { as.wfilter = t.value; renderAssign(); }
+  else if (t.matches("[data-due]")) { assignments.find((a) => a.id === +t.dataset.due).due = t.value; renderAssign(); renderWorkflows(); toast(t.value ? `Finish-by date is now ${dshort(t.value)}` : "Finish-by date cleared"); }
+});
+document.addEventListener("input", (e) => {
+  if (e.target.id === "asSearch") { as.q = e.target.value; renderAssign(); }
+  if (e.target.id === "asNote") renderAssign();
+});
+
+// ================= review (review/page.tsx) =================
+// Sample data only. Same fields as the product's ReviewItem: observed, expected, note, decision, comment.
+const items = [
+  { id: 1, learner: "Alex Kim", workflow: "Meal expense report", step: "Step 5 · Attach approval", time: "03:42", observed: "Saved the expense without attaching the approval email.", expected: "Attached the supervisor's approval before saving, because the meal was over 30 per person.", note: "The 30-per-person limit may apply here." },
+  { id: 2, learner: "Alex Kim", workflow: "Meal expense report", step: "Step 2 · Choose expense type", time: "02:05", observed: "Picked Travel instead of Meal.", expected: "Picked Meal, because it was a restaurant bill.", note: "The receipt is from a restaurant." },
+  { id: 3, learner: "Alex Kim", workflow: "Meal expense report", step: "Step 6 · Add guests", time: "05:30", observed: "Added two guests.", expected: "Added all four guests listed on the receipt.", note: "Guest count changes the per-person amount." },
+  { id: 4, learner: "Jordan Patel", workflow: "Vendor onboarding", step: "Step 3 · Request tax form", time: "04:12", observed: "Skipped the tax form.", expected: "Requested the tax form for every new vendor.", note: "Required for every new vendor." },
+  { id: 5, learner: "Jordan Patel", workflow: "Vendor onboarding", step: "Step 4 · Create vendor record", time: "06:48", observed: "Used the company name from the email signature.", expected: "Used the legal name from the tax form.", note: "The legal name must match the tax form." },
+  { id: 6, learner: "Sam Rivera", workflow: "Meal expense report", step: "Step 3 · Add receipt", time: "02:50", observed: "Attached a photo of the menu.", expected: "Attached the paid receipt showing the total.", note: "The receipt must show the amount paid." },
+  { id: 7, learner: "Sam Rivera", workflow: "Meal expense report", step: "Step 7 · Enter tip", time: "04:01", observed: "Added the tip to the meal amount.", expected: "Entered the tip in its own field.", note: "" },
+  // Recorded by Priya Nair and Marcus Lee: only they (and managers) see these, not Sarah.
+  { id: 8, learner: "Alex Kim", workflow: "Customer feedback loop", step: "Step 3 · Tag the feedback", time: "01:48", observed: "Left the feedback untagged.", expected: "Tagged it with the product area before filing.", note: "Untagged feedback is not routed to a team." },
+  { id: 9, learner: "Dana Ortiz", workflow: "Incident response", step: "Step 2 · Set severity", time: "02:20", observed: "Set severity to Low.", expected: "Set severity to High, because customers were affected.", note: "Customer impact usually means High." },
+  { id: 10, learner: "Dana Ortiz", workflow: "Incident response", step: "Step 5 · Notify on-call", time: "04:55", observed: "Posted in the team channel only.", expected: "Paged the on-call engineer first.", note: "" },
+];
+const state = { submitted: false, view: "all", learner: "", workflow: "" };
+function card(i, n) {
+  const st = i.decision === "fine" ? ["fine", "● Fine as it is"] : i.decision === "needs_correction" ? ["needs", "⚑ Needs correction"] : ["", "● Pending"];
+  const side = state.submitted
+    ? `<span class="state ${st[0]}">${st[1]}</span>${i.comment ? `<p class="done-t"><b style="font-weight:500">Note:</b> ${esc(i.comment)}</p>` : ""}`
+    : `<span class="state ${st[0]}">${st[1]}</span>
+       <div class="btns">
+         <button class="opt fine" data-d="fine" aria-pressed="${i.decision === "fine"}">✓ Fine</button>
+         <button class="opt needs" data-d="needs_correction" aria-pressed="${i.decision === "needs_correction"}">⚑ Needs correction</button>
+       </div>
+       <textarea class="comment" data-comment placeholder="Add a note for the new hire (optional)" aria-label="Note for the new hire">${esc(i.comment || "")}</textarea>`;
+  return `<li class="item" data-id="${i.id}">
+    <div class="shotcol"><div class="shot">APP SCREEN<span class="tg">${esc(i.time)}</span></div><a href="#" data-toast="Opens the screenshot full size">View full size</a></div>
+    <div class="mid">
+      <div class="where"><b>${esc(i.workflow)}</b> › ${esc(i.step)}<small>Training session · #${n}</small></div>
+      <div class="cmp"><div><span class="label">What the new hire did</span>${esc(i.observed)}</div><div class="exp"><span class="label">What the expert did</span>${esc(i.expected)}</div></div>
+      ${i.note ? `<p class="qn">✦ Note: ${esc(i.note)}</p>` : ""}
+    </div>
+    <div class="side">${side}</div>
+  </li>`;
+}
+function render() {
+  const vis = items.filter(canSee);
+  const open = vis.filter((i) => !i.decision).length;
+  const fine = vis.filter((i) => i.decision === "fine").length;
+  const needs = vis.filter((i) => i.decision === "needs_correction").length;
+  const decided = fine + needs;
+  $("#sOpen").textContent = open; $("#sFine").textContent = fine; $("#sNeeds").textContent = needs;
+  $("#navCount").textContent = open; $("#navCount").style.display = open ? "" : "none";
+  $("#decidedText").textContent = `${decided}/${vis.length} decided`;
+  $("#submit").disabled = state.submitted || decided < vis.length;
+  $("#submit").style.display = state.submitted ? "none" : "";
+  $("#submitted").style.display = state.submitted ? "block" : "none";
+  const shown = vis.filter((i) =>
+    (!state.learner || i.learner === state.learner) && (!state.workflow || i.workflow === state.workflow) &&
+    (state.view === "all" || (state.view === "open" ? !i.decision : !!i.decision)));
+  const groups = {}; shown.forEach((i) => (groups[i.learner] ||= []).push(i));
+  let n = 0;
+  $("#list").innerHTML = Object.entries(groups).map(([name, list]) => {
+    const done = list.filter((i) => i.decision).length;
+    return `<div class="group" data-group="${esc(name)}">
+      <div class="ghead"><span class="av">${initials(name)}</span>${esc(name)} · ${list.length - done} to review<button data-collapse>Collapse ▴</button></div>
+      <ol class="cards">${list.map((i) => card(i, ++n)).join("")}</ol></div>`;
+  }).join("");
+  $("#empty").textContent = isMgr() ? "Nothing under review yet. Items appear here when the new hire practises in Training." : "No reviews are assigned to you.";
+  $("#empty").style.display = shown.length ? "none" : "block";
+  $(".bar").classList.toggle("none", !vis.length);
+}
+$("#fLearner").addEventListener("change", (e) => { state.learner = e.target.value; render(); });
+$("#fWorkflow").addEventListener("change", (e) => { state.workflow = e.target.value; render(); });
+$("#submit").addEventListener("click", () => { state.submitted = true; render(); renderAssign(); window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }); });
+document.addEventListener("input", (e) => { if (!e.target.matches("[data-comment]")) return; const li = e.target.closest(".item"); items.find((x) => x.id === +li.dataset.id).comment = e.target.value; });
+function buildFilters() {
+  const v = items.filter(canSee); state.learner = ""; state.workflow = "";
+  $("#fLearner").innerHTML = `<option value="">All learners</option>` + [...new Set(v.map((i) => i.learner))].map((n) => `<option>${esc(n)}</option>`).join("");
+  $("#fWorkflow").innerHTML = `<option value="">All workflows</option>` + [...new Set(v.map((i) => i.workflow))].map((n) => `<option>${esc(n)}</option>`).join("");
+}
+
+// ================= process map (Meal expense report) =================
+// One entry per step, as the product's /api/processmap returns it: tool, inputs (name, source), outputs, feedsInto, rule, decision, open questions.
+const pm = { wid: null };
+const TOOL_COLORS = ["#5146d9", "#2f74d0", "#0f8a6a", "#b25e09", "#a23b72", "#4b5563"];
+const PROC = [
+  { t: "Read the expense email", tool: "Email", time: "00:00", dur: 25, needs: [["Request and receipt", "Colleague's email"]], makes: ["Amount", "Guest count"], feeds: [6], rule: "", decision: "", ask: [] },
+  { t: "Choose expense type", tool: "Ledgerline", time: "00:25", dur: 18, needs: [["Receipt", "Step 1"]], makes: ["Expense type"], feeds: [], rule: "A restaurant bill is always Meal, never Travel.", decision: "Meal, because it is a restaurant bill.", ask: [] },
+  { t: "Add the paid receipt", tool: "Ledgerline", time: "00:43", dur: 40, needs: [["Paid receipt", "Colleague's email"]], makes: ["Receipt attached"], feeds: [], rule: "The receipt must show the amount paid, not the menu.", decision: "", ask: [] },
+  { t: "Find the approval email", tool: "Email", time: "01:23", dur: 35, needs: [["Supervisor approval", "Supervisor's email"]], makes: ["Approval email"], feeds: [5], rule: "Over 30 per person needs the supervisor's approval.", decision: "Look for it only when the meal is over the limit.", ask: ["Who approves when the supervisor is away?"] },
+  { t: "Attach the approval", tool: "Ledgerline", time: "01:58", dur: 22, needs: [["Approval email", "Step 4"]], makes: ["Approval attached"], feeds: [], rule: "", decision: "", ask: [] },
+  { t: "Add every guest", tool: "Ledgerline", time: "02:20", dur: 48, needs: [["Guest count", "Step 1"], ["Guest names", "Receipt"]], makes: ["Guest list"], feeds: [8], rule: "", decision: "All guests on the receipt, not only the ones who ordered.", ask: ["Are external guests entered the same way?"] },
+  { t: "Enter the tip", tool: "Ledgerline", time: "03:08", dur: 20, needs: [["Tip amount", "Receipt"]], makes: ["Tip"], feeds: [], rule: "The tip goes in its own field, never in the meal amount.", decision: "", ask: [] },
+  { t: "Save and submit", tool: "Ledgerline", time: "03:28", dur: null, needs: [["Guest list", "Step 6"], ["Tip", "Step 7"]], makes: ["Submitted expense"], feeds: [], rule: "", decision: "", ask: [] },
+];
+const fmtDur = (s) => s == null ? "–" : s < 60 ? `${s}s` : `${Math.floor(s / 60)}m${s % 60 ? " " + (s % 60) + "s" : ""}`;
+function renderProcess() {
+  const vis = visibleWorkflows(), sel = $("#pmSelect");
+  if (!pm.wid || !wfById(pm.wid)) pm.wid = (vis[0] || {}).id || null;
+  $("#pmLink").style.display = isMgr() ? "none" : "";
+  const ok = !!pm.wid && canOpen(pm.wid);
+  $("#pmDenied").style.display = ok ? "none" : ""; $("#pmHead").style.display = ok ? "" : "none"; $("#pmContent").style.display = ok ? "" : "none";
+  sel.style.display = ok && vis.length ? "" : "none";
+  sel.innerHTML = vis.map((w) => `<option value="${w.id}">${esc(w.name)}</option>`).join(""); if (vis.some((w) => w.id === pm.wid)) sel.value = pm.wid;
+  if (!ok) return;
+  $("#pmName").textContent = wname(pm.wid);
+  const tools = [...new Set(PROC.map((s) => s.tool))], color = (t) => TOOL_COLORS[Math.max(0, tools.indexOf(t)) % TOOL_COLORS.length];
+  const total = PROC.reduce((a, s) => a + (s.dur || 0), 0), rules = PROC.filter((s) => s.rule || s.decision).length, qs = PROC.reduce((a, s) => a + s.ask.length, 0);
+  $("#pmTiles").innerHTML = [[PROC.length, "Steps"], [fmtDur(total), "Recorded time"], [tools.length, "Tools and sites"], [rules, "Decision points"], [qs, "Open questions"]].map(([n, l]) => `<div class="tile2"><b>${n}</b><span>${l}</span></div>`).join("");
+  $("#pmSteps").innerHTML = PROC.map((s, i) => `<li><span class="num" style="background:${color(s.tool)}">${i + 1}</span>
+    <div class="card" id="step-${i + 1}"><div class="ttl"><span>${esc(s.t)}</span><span class="time">${s.time} · ${fmtDur(s.dur)}</span></div>
+    <span class="tool" style="background:${color(s.tool)}">${esc(s.tool)}</span>
+    <div class="two"><div><h4>Needs</h4><ul>${s.needs.map(([n, src]) => `<li>${esc(n)} <span>← ${esc(src)}</span></li>`).join("") || '<li class="none">Nothing specific</li>'}</ul></div>
+    <div><h4>Produces</h4><ul>${s.makes.map((m) => `<li>${esc(m)}</li>`).join("")}${s.feeds.length ? `<li><span>→ used in ${s.feeds.map((f) => `<a href="#step-${f}" data-jump="${f}">step ${f}</a>`).join(", ")}</span></li>` : ""}</ul></div></div>
+    ${s.decision ? `<div class="decision"><b>Decision:</b> ${esc(s.decision)}</div>` : ""}${s.rule ? `<div class="ruleline"><b>Rule:</b> ${esc(s.rule)}</div>` : ""}
+    ${s.ask.length ? `<div class="ask"><b>Ask the expert:</b><ul>${s.ask.map((q) => `<li>${esc(q)}</li>`).join("")}</ul></div>` : ""}</div></li>`).join("");
+  $("#pmData").innerHTML = PROC.flatMap((s, i) => s.needs.map(([n, src]) => `<tr><td>${esc(n)}</td><td style="color:${src === "unknown" ? "#b25e09" : "var(--body)"}">${esc(src)}</td><td>step ${i + 1}</td></tr>`)).join("");
+  renderDiagram(tools, color);
+}
+// Same layout rules as ProcessDiagram.tsx: lane per tool, steps wrap into rows, diamond before a rule, durations on arrows, dashed data links.
+function renderDiagram(tools, color) {
+  const box = $("#pdBox"); if (!box || !box.clientWidth) return;
+  const LANE_H = 196, LABEL_W = 40, PAD = 26, GAP = 60, BAND_GAP = 40, BOX_W = 210, BOX_H = 144, RULE_W = 136, DIA = 64, PILL_W = 74, PILL_H = 40;
+  const maxW = Math.max(box.clientWidth, 760), laneOf = (s) => tools.indexOf(s.tool);
+  const nodes = []; let x = LABEL_W + PAD, band = 0;
+  const push = (n, keep = 0) => { if (x + n.w + keep + PAD > maxW && x > LABEL_W + PAD) { band++; x = LABEL_W + PAD; } nodes.push({ ...n, x, band }); x += n.w + GAP; };
+  push({ kind: "start", lane: laneOf(PROC[0]), w: PILL_W, h: PILL_H });
+  PROC.forEach((s, i) => {
+    if (s.rule) push({ kind: "rule", lane: laneOf(s), w: RULE_W, h: DIA, s, text: s.rule, i }, GAP + BOX_W);
+    push({ kind: "step", lane: laneOf(s), w: BOX_W, h: BOX_H, s, i }, i === PROC.length - 1 ? GAP + PILL_W : 0);
+  });
+  push({ kind: "end", lane: laneOf(PROC[PROC.length - 1]), w: PILL_W, h: PILL_H });
+  const bands = band + 1;
+  const rowLanes = Array.from({ length: bands }, (_, b) => [...new Set(nodes.filter((n) => n.band === b).map((n) => n.lane))].sort((a, c) => a - c));
+  const tops = []; let y = 0; rowLanes.forEach((ls) => { tops.push(y); y += ls.length * LANE_H + BAND_GAP; });
+  const width = band ? maxW : x - GAP + PAD, height = y - BAND_GAP;
+  const cy = (n) => tops[n.band] + rowLanes[n.band].indexOf(n.lane) * LANE_H + LANE_H / 2;
+  const flow = nodes.slice(0, -1).map((a, k) => {
+    const b = nodes[k + 1], x1 = a.x + a.w, y1 = cy(a), x2 = b.x - 4, y2 = cy(b), label = a.kind === "step" ? fmtDur(a.s.dur) : "";
+    if (a.band !== b.band) { const turn = tops[b.band] - BAND_GAP / 2, right = x1 + 18, left = b.x - 22; return { d: `M${x1},${y1} H${right} V${turn} H${left} V${y2} H${x2}`, label, lx: (right + left) / 2, ly: turn - 6 }; }
+    const mx = x1 + GAP / 2;
+    return { d: y1 === y2 ? `M${x1},${y1} H${x2}` : `M${x1},${y1} H${mx} V${y2} H${x2}`, label, lx: (x1 + (y1 === y2 ? x2 : mx)) / 2, ly: y1 - 9 };
+  });
+  const stepNodes = nodes.filter((n) => n.kind === "step");
+  const links = stepNodes.flatMap((a, k) => a.s.feeds.filter((f) => f - 1 !== stepNodes[k + 1]?.i && stepNodes[f - 1]?.band === a.band).map((f) => {
+    const b = stepNodes[f - 1], x1 = a.x + a.w / 2, y1 = cy(a) + BOX_H / 2, x2 = b.x + b.w / 2, y2 = cy(b) + BOX_H / 2 + 4, dip = Math.max(y1, y2) + 22;
+    return `<path d="M${x1},${y1} C${x1},${dip} ${x2},${dip} ${x2},${y2}" fill="none" stroke="#5146d9" stroke-opacity=".55" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#pd-d)"><title>Step ${a.i + 1} feeds step ${f}</title></path>`;
+  }));
+  const lanes = rowLanes.map((ls, b) => ls.map((li, k) => `<div class="lane ${k % 2 ? "alt" : ""} ${b && !k ? "first" : ""}" style="top:${tops[b] + k * LANE_H}px;height:${LANE_H}px"><div class="lbl" style="width:${LABEL_W}px"><i style="background:${color(tools[li])}"></i><span>${esc(tools[li])}</span></div></div>`).join("")).join("");
+  const nodeHtml = nodes.map((n) => {
+    const top = cy(n) - n.h / 2;
+    if (n.kind === "start" || n.kind === "end") return `<div class="pill-n" style="left:${n.x}px;top:${top}px;width:${n.w}px;height:${n.h}px">${n.kind === "start" ? "Start" : "End"}</div>`;
+    if (n.kind === "rule") return `<a class="rule" href="#step-${n.i + 1}" data-jump="${n.i + 1}" style="left:${n.x}px;top:${top}px;width:${n.w}px" title="${esc(n.text)}"><div class="dia" style="width:${DIA}px;height:${DIA}px"><div><span>${n.s.rule ? "Rule" : "Decide"}</span></div></div><p>${esc(n.text)}</p></a>`;
+    const s = n.s, line = (l, a) => `<p><b>${l}:</b> ${a.length ? esc(a.join(", ")) : '<span style="color:#98a2b3">nothing recorded</span>'}</p>`;
+    return `<a class="sbox" href="#step-${n.i + 1}" data-jump="${n.i + 1}" style="left:${n.x}px;top:${top}px;width:${n.w}px;height:${n.h}px"><div class="h" style="background:${color(s.tool)}"><em>${n.i + 1}</em><strong>${esc(s.t)}</strong></div><div class="b">${line("Needs", s.needs.map((q) => q[0]))}${line("Produces", s.makes)}<div class="badges">${s.rule ? '<span class="r">◆ 1 rule</span>' : ""}${s.ask.length ? `<span class="q">? ${s.ask.length} to ask</span>` : ""}</div></div></a>`;
+  }).join("");
+  box.innerHTML = `<div class="pd-in" style="width:${width}px;height:${height}px">${lanes}
+    <svg width="${width}" height="${height}" aria-hidden="true"><defs>
+      <marker id="pd-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#667085"/></marker>
+      <marker id="pd-d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5146d9"/></marker></defs>
+      ${links.join("")}${flow.map((f) => `<path d="${f.d}" fill="none" stroke="#667085" stroke-width="1.6" marker-end="url(#pd-a)"/>${f.label && f.label !== "–" ? `<text x="${f.lx}" y="${f.ly}" text-anchor="middle">${f.label}</text>` : ""}`).join("")}
+    </svg>${nodeHtml}</div>`;
+}
+window.addEventListener("resize", () => { if (document.body.dataset.page === "process") renderProcess(); });
+
+// ================= training (what the new hire sees) =================
+const tr = { who: "Alex Kim" };
+function renderTraining() {
+  $("#trWho").innerHTML = learners.map((n) => `<option ${n === tr.who ? "selected" : ""}>${esc(n)}</option>`).join("");
+  const mine = assignments.filter((a) => a.learner === tr.who).sort((a, b) => RANK[statusOf(a)[0]] - RANK[statusOf(b)[0]] || (a.due || "9").localeCompare(b.due || "9"));
+  const open = active(mine).length;
+  $("#trNone").style.display = mine.length ? "none" : "block";
+  $("#trMine").innerHTML = mine.map((a) => {
+    const nn = wsteps(a.wid), [cls, label] = statusOf(a);
+    return `<li class="${cls === "late" ? "late" : cls === "done" ? "done" : ""}"><div>
+      <h3>${esc(wname(a.wid))}</h3><p class="meta">${plural(nn, "step")} · taught by ${esc((wfById(a.wid) || {}).expert || "")}${a.due && cls !== "done" ? ` · <b style="color:${cls === "late" ? "var(--err)" : "inherit"};font-weight:500">${dueText(a)}</b> (${dshort(a.due)})` : ""}</p>
+      ${a.note ? `<p class="from"><b>From your supervisor:</b> ${esc(a.note)}</p>` : ""}
+      <div class="prog"><div class="track"><i style="width:${Math.min(100, Math.round(a.learned / nn * 100))}%"></i></div><small>${a.learned}/${nn} learned${a.relearn ? " · " + a.relearn + " to relearn" : ""}</small></div></div>
+      <div class="go"><span class="st ${cls}">${label}</span>${cls === "done" ? `<button class="btn sm plain" data-toast="Opens practice again">Practise again</button>` : `<button class="btn pri" data-toast="Opens Training on this workflow">${a.learned ? (a.relearn ? "Relearn " + a.relearn + (a.relearn > 1 ? " steps" : " step") : "Continue") : "Start"}</button>`}</div></li>`;
+  }).join("");
+}
+$("#trWho").addEventListener("change", (e) => { tr.who = e.target.value; renderTraining(); });
+
+// ================= one click handler =================
+document.addEventListener("click", (e) => {
+  const c = (sel) => e.target.closest(sel);
+  let x;
+  if ((x = c("[data-toast]"))) { e.preventDefault(); return toast(x.dataset.toast); }
+  if ((x = c("[data-assign]"))) { as.wid = x.dataset.assign; return; }
+  if ((x = c("[data-assign-filter]"))) { as.wfilter = x.dataset.assignFilter; as.status = "all"; return; }
+  if ((x = c("[data-process]"))) { pm.wid = x.dataset.process; return; }
+  if ((x = c("[data-deeplink]"))) { pm.wid = x.dataset.deeplink; if (document.body.dataset.page === "process") renderProcess(); return; }
+  if ((x = c("[data-jump]"))) { return; }
+  if (c("[data-f-draft]")) { wf.f = "draft"; document.querySelectorAll("[data-f]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.f === "draft")); renderWorkflows(); return; }
+  if ((x = c("[data-approve]"))) { wfById(x.dataset.approve).published = true; renderWorkflows(); renderAssign(); return toast("Approved: ready to teach"); }
+  if ((x = c("[data-ask]"))) { wf.confirming = x.dataset.ask; wf.error = false; return renderWorkflows(); }
+  if (c("[data-cancel]")) { wf.confirming = null; return renderWorkflows(); }
+  if ((x = c("[data-del]"))) { const id = x.dataset.del; workflows.splice(workflows.findIndex((w) => w.id === id), 1); for (let k = assignments.length - 1; k >= 0; k--) if (assignments[k].wid === id) assignments.splice(k, 1); wf.confirming = null; renderWorkflows(); renderAssign(); return toast("Workflow deleted"); }
+  if ((x = c("[data-f]"))) { wf.f = x.dataset.f; document.querySelectorAll("[data-f]").forEach((b) => b.setAttribute("aria-pressed", b === x)); return renderWorkflows(); }
+  if ((x = c("[data-st]"))) { as.status = x.dataset.st; return renderAssign(); }
+  if ((x = c("[data-days]"))) { const d = +x.dataset.days; $("#asDue").value = d ? plusDays(d) : ""; return renderAssign(); }
+  if (c("#asAll")) { learners.forEach((n) => { if (!(as.wid && assignments.some((a) => a.learner === n && a.wid === as.wid && statusOf(a)[0] !== "done"))) as.picked.add(n); }); return renderAssign(); }
+  if ((x = c("[data-nudge]"))) { const a = assignments.find((q) => q.id === +x.dataset.nudge); return toast(`Reminder sent to ${a.learner}`); }
+  if ((x = c("[data-rm]"))) {
+    const i = assignments.findIndex((a) => a.id === +x.dataset.rm), [gone] = assignments.splice(i, 1); renderAssign(); renderWorkflows();
+    return toast(`Removed ${gone.learner} from ${wname(gone.wid)}`, () => { assignments.splice(i, 0, gone); renderAssign(); renderWorkflows(); });
+  }
+  if ((x = c("[data-review]"))) { state.learner = x.dataset.review; $("#fLearner").value = state.learner; render(); return; }
+  if (c("#asGo")) {
+    const w = wfById(as.wid), d = $("#asDue").value, note = $("#asNote").value.trim(), n = as.picked.size;
+    [...as.picked].reverse().forEach((name) => assignments.unshift({ id: nextId++, learner: name, wid: w.id, due: d, note, learned: 0, relearn: 0 }));
+    as.picked.clear(); as.q = ""; $("#asSearch").value = ""; $("#asDue").value = ""; $("#asNote").value = ""; as.status = "all"; as.wfilter = "";
+    renderAssign(); renderWorkflows(); return toast(`${w.name} assigned to ${plural(n, "new hire")}`);
+  }
+  // review page
+  if ((x = c("[data-view]"))) { state.view = x.dataset.view; document.querySelectorAll("[data-view]").forEach((b) => b.setAttribute("aria-pressed", b === x)); return render(); }
+  if ((x = c("[data-collapse]"))) { const g = x.closest(".group"); g.classList.toggle("collapsed"); x.textContent = g.classList.contains("collapsed") ? "Expand ▾" : "Collapse ▴"; return; }
+  const li = c(".item"), item = li && items.find((q) => q.id === +li.dataset.id);
+  if (!item || state.submitted) return;
+  const dd = c("[data-d]");
+  if (dd) { item.decision = dd.dataset.d; render(); renderAssign(); if (item.decision === "needs_correction" && !item.comment) { const k = document.querySelector(`.item[data-id="${item.id}"] .comment`); if (k) k.focus(); } }
+});
+$("#pmSelect").addEventListener("change", (e) => { pm.wid = e.target.value; renderProcess(); });
+
+// ================= viewing as (sketch only) =================
+function renderMe() {
+  $("#meName").textContent = me.name; $("#meEmail").textContent = me.email; $("#meRole").textContent = ROLE[me.role];
+}
+$("#meSel").innerHTML = USERS.map((u, k) => `<option value="${k}">${ROLE[u.role]} · ${esc(u.name)}</option>`).join("");
+$("#meSel").addEventListener("change", (e) => {
+  me = USERS[+e.target.value];
+  wf.confirming = null; wf.q = ""; wf.f = "all"; $("#wfQuery").value = ""; document.querySelectorAll("[data-f]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.f === "all"));
+  as.picked.clear(); pm.wid = null; if (learners.includes(me.name)) tr.who = me.name;
+  buildFilters(); renderMe(); renderWorkflows(); renderAssign(); render(); renderTraining(); route();
+});
+
+// ================= router =================
+const PAGES = ["workflows", "reviews", "assign", "process", "training"];
+function route() {
+  const h = location.hash.slice(1), v = PAGES.includes(h) ? h : h.startsWith("step-") ? "process" : "workflows";
+  document.body.dataset.page = v;
+  document.querySelectorAll(".view").forEach((s) => s.classList.toggle("active", s.id === "view-" + v));
+  const tab = v === "process" ? "workflows" : v;
+  document.querySelectorAll("[data-nav]").forEach((a) => (a.dataset.nav === tab ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current")));
+  if (v === "workflows") renderWorkflows();
+  if (v === "assign") renderAssign();
+  if (v === "process") renderProcess();
+  if (v === "training") renderTraining();
+  if (!h.startsWith("step-")) window.scrollTo(0, 0);
+}
+window.addEventListener("hashchange", route);
+buildFilters(); renderMe(); renderWorkflows(); renderAssign(); render(); route();
+</script>
+</body>
+</html>
