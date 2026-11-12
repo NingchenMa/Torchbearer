@@ -360,7 +360,7 @@
   <nav class="nav" aria-label="Main">
     <a href="#workflows" data-nav="workflows"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span>Workflows</span></a>
     <a href="#reviews" data-nav="reviews"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg><span>Reviews</span><b class="count" id="navCount">7</b></a>
-    <a href="#assign" data-nav="assign"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Assign</span></a>
+    <a href="#assign" data-nav="assign" id="navAssign" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Assign</span></a>
   </nav>
   <div class="nav-label" style="margin-top:22px">Modules</div>
   <nav class="nav" aria-label="Modules">
@@ -989,7 +989,7 @@ $("#acForm").addEventListener("submit", (e) => {
 
 // ================= viewing as (sketch only) =================
 function renderMe() {
-  $("#navAccess").hidden = !canManageAccess();
+  $("#navAccess").hidden = !canManageAccess(); $("#navAssign").hidden = !isMgr();
   $("#meName").textContent = me.name; $("#meEmail").textContent = me.email; $("#meRole").textContent = ROLE[me.role];
 }
 $("#meSel").innerHTML = USERS.map((u, k) => `<option value="${k}">${ROLE[u.role]} · ${esc(u.name)}</option>`).join("");
