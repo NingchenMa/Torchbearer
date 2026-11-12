@@ -147,7 +147,7 @@ export default function ReviewPage() {
       </div>
 
       {open.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-10 flex h-16 items-center justify-end gap-3 border-t border-line bg-white/95 px-4 sm:px-7 md:left-[240px]">
+        <div className="fixed bottom-0 left-16 right-0 z-10 flex h-16 items-center justify-end gap-3 border-t border-line bg-white/95 px-4 sm:px-7 md:left-60">
           <span className="text-[14px] text-[#667085]">{decidedOpen}/{open.length} decided</span>
           <button onClick={submit} disabled={decidedOpen < open.length || submitting} className="h-11 rounded-sm bg-indigo px-5 text-[15px] text-white hover:bg-indigo-dark disabled:opacity-40">
             {submitting ? "Submitting…" : "Submit review"}

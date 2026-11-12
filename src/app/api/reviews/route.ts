@@ -1,6 +1,7 @@
 // Review batches: what the new hire did that might differ from the approved way.
 //   GET  /api/reviews                       the batches this person may review (managers and admins: all;
 //                                           employees: practice on workflows they recorded)
+//   GET  /api/reviews?count=1               { open }: how many items still wait for a decision (the sidebar badge)
 //   GET  /api/reviews?mine=1&workflow=<id>  the signed-in person's own batch for a workflow (Training reads it on start)
 //   POST /api/reviews { workflowId, items } the person training adds the items Training flagged. They only ever
 //                                           write their own batch, and never decisions.
@@ -26,7 +27,12 @@ export async function GET(req: Request) {
     const batch = await orgDb(u.org).readJson<ReviewBatch>(reviewPath(q.get("workflow") ?? "none", u.id));
     return NextResponse.json(batch);
   }
-  return NextResponse.json(await reviewableBatches(u));
+  const batches = await reviewableBatches(u);
+  if (q.get("count")) {
+    const open = batches.filter((b) => !b.submitted).reduce((n, b) => n + b.items.filter((i) => !i.decision).length, 0);
+    return NextResponse.json({ open });
+  }
+  return NextResponse.json(batches);
 }
 
 export async function POST(req: Request) {
