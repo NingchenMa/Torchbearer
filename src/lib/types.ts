@@ -141,6 +141,29 @@ export interface Member {
   role: Role;
 }
 
+/** A workflow a manager gave to an employee to train on. Stored in assignments/index.json. */
+export interface Assignment {
+  id: string;
+  workflowId: string;
+  learnerId: string; // Cognito user ID
+  learnerName: string;
+  assignedById: string;
+  assignedByName: string;
+  due?: string; // "YYYY-MM-DD"
+  note?: string; // shown to the employee in Training
+  createdAt: string;
+}
+
+/** An assignment with the workflow's details and how far the employee has got. */
+export interface AssignmentView extends Assignment {
+  workflowName: string;
+  /** Who recorded the workflow, for display. */
+  trainedBy?: string;
+  stepCount: number;
+  learned: number;
+  relearn: number;
+}
+
 /** The supervisor's review batch for one learner. */
 export interface ReviewBatch {
   learner: string;
