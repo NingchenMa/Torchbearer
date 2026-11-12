@@ -72,6 +72,28 @@ AWS Amplify Hosting ── Next.js pages + API routes (server code)
 
 **Turned down:** the Amplify site password alone (one shared password, no per-company data); Amplify's own auth library (client-side tokens, more code in the browser).
 
+### D3b. Roles: Cognito groups (admin, manager, employee)
+**Chosen:** a person's role is their Cognito **group**: `admin`, `manager`, or no group (= employee). Cognito puts the groups in the ID token (`cognito:groups`), so `userFromToken` reads the role with no extra call and no new permission. The rules live in `src/lib/roles.ts` and every API route enforces them; the pages only use the role to decide what to show.
+
+| Role | Sees | Can do |
+|---|---|---|
+| Admin, Manager | every workflow, review and assignment in their company | open, edit, approve and delete any workflow; review any practice session; assign workflows to employees |
+| Employee | only the workflows they recorded, and the work assigned to them | open and approve their own workflows; review practice sessions on them; train on what is assigned to them |
+
+A workflow's owner is the recorder's Cognito user ID (`ownerId`), never their display name. Workflows saved before owners existed have none, so only a manager or admin can open them.
+
+**One-time setup:** create the two groups, then invite people with a role (the script adds them to the group).
+
+```bash
+aws cognito-idp create-group --region us-east-1 --user-pool-id us-east-1_YyfcIjRiS --group-name manager
+aws cognito-idp create-group --region us-east-1 --user-pool-id us-east-1_YyfcIjRiS --group-name admin
+scripts/invite-user.sh <email> "<Full Name>" <company-id> manager
+```
+
+To change an existing person's role: `aws cognito-idp admin-add-user-to-group` or `admin-remove-user-from-group`. It takes effect the next time their sign-in token is renewed (within an hour).
+
+**Company directory:** Cognito cannot list people by company, so each person is written to `orgs/<company>/members/index.json` when they sign in (`src/lib/members.ts`). Managers pick people from it on the Assign page, so someone appears there after their first sign-in.
+
 ### D4. Secrets: Amplify environment variables
 API keys are set on the Amplify branch and written to `.env.production` during the build (`amplify.yml`), which is how Amplify makes them visible to server routes. They never reach the browser. Move to AWS Secrets Manager when there is more than one environment or more people with console access.
 

@@ -1,5 +1,6 @@
 // Shared data formats. Source of truth: docs/formats.md — change both together.
 // The work app is the Ledgerline expense tool (public/ledgerline.html).
+import type { Role } from "./roles";
 
 /** What the Ledgerline mock sends with save / form events (its `snapshot()`). */
 export interface ExpenseSnapshot {
@@ -126,6 +127,14 @@ export interface WorkflowSummary {
   stepCount: number;
   /** Who recorded it (the signed-in expert's name), when known. */
   trainedBy?: string;
+}
+
+/** Someone in the company: kept so managers can pick people to assign work to. */
+export interface Member {
+  id: string; // Cognito user ID
+  name: string;
+  email: string;
+  role: Role;
 }
 
 /** The supervisor's review batch for one learner. */
