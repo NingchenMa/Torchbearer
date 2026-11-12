@@ -317,7 +317,7 @@
   .item .side { padding: 16px; display: flex; flex-direction: column; gap: 10px; border-left: 1px solid var(--line); }
   .state { align-self: flex-start; border-radius: 999px; padding: 3px 12px; font-size: 13px; font-weight: 500; background: var(--warn-soft); color: var(--warn-text); }
   .state.fine { background: var(--ok-soft); color: var(--ok); } .state.needs { background: var(--err-soft); color: var(--err); }
-  .side .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .side .btns { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 8px; }
   .side .opt { height: 40px; padding: 0 8px; font-size: 14px; font-weight: 500; white-space: nowrap; }
   .side .comment { height: auto; min-height: 64px; width: 100%; padding: 8px 10px; resize: vertical; }
   .side .done-t { margin: 0; font-size: 14px; color: var(--body); }
