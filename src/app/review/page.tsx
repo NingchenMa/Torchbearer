@@ -202,7 +202,7 @@ function ReviewCard({ batch, item, n, onChange }: { batch: ReviewBatch; item: Re
           item.comment && <p className="text-[14px] text-[#475467]"><b className="font-medium">Note:</b> {item.comment}</p>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-2">
               <button onClick={() => onChange({ decision: "fine" })} aria-pressed={item.decision === "fine"} className={`h-10 whitespace-nowrap rounded-sm border px-2 text-[14px] font-medium ${item.decision === "fine" ? "border-ok bg-ok text-white" : "border-ok bg-white text-ok hover:bg-ok-soft"}`}>
                 ✓ Fine
               </button>
