@@ -80,6 +80,23 @@ All events go through the bus in `src/lib/events.ts`:
 - `offRecord`: `{from, to}` windows the expert took off the record; /map shows them as gaps.
 - `published`: the expert approved the map on /map ("Approve & publish"). Teaching mode uses only a published map, otherwise the prepared sample.
 
+## Who owns what: roles, owners, assignments, reviews
+
+Everything is stored per company under `orgs/<company>/` in S3. Rules live in `src/lib/roles.ts`; every API route enforces them. See `docs/aws-deployment.md` (D3b) for how roles are set.
+
+- **Role** (`admin` | `manager` | `employee`): the person's Cognito group. No group = employee.
+- `members/index.json`: `Member[]` = `{ id, name, email, role, employeeId? }`, written when an admin adds someone (employee ID required) and when someone signs in. Managers pick from it on /assign; admins manage it on /access.
+- `workflows/<id>.json` (`WorkflowRecord`) and `workflows/index.json` (`WorkflowSummary[]`) carry `ownerId`, the recorder's Cognito user ID, set by the server on first save. A workflow without `ownerId` was saved before owners existed: only a manager or admin can open it.
+- `assignments/index.json`: `Assignment[]` = `{ id, workflowId, learnerId, learnerName, assignedById, assignedByName, due?, note?, createdAt }`. `GET /api/assignments` adds the workflow name, step count and progress (`AssignmentView`).
+- `progress/<workflow>/<user id>.json`: `{ [stepId]: "learned" | "relearn" }` for that person. Written by the person as they practise, and by the server when a review is submitted.
+- `reviews/<workflow>/<learner id>.json` (`ReviewBatch`): the items from one person's practice on one workflow. `reviews/index.json` lists the `{ workflowId, learnerId }` pairs that exist. A manager or admin reviews any batch; an employee reviews batches on workflows they recorded.
+
+| Who | Workflows | Reviews | Assign | Training |
+|---|---|---|---|---|
+| Admin | all; open, edit, approve, delete | all | yes | only what is assigned to them. Also: Access management (change access, add members) |
+| Manager | all; open, edit, approve, delete | all | yes | only what is assigned to them |
+| Employee | only their own; open, edit, approve | only practice on their own workflows | no | only what is assigned to them |
+
 ## GuardrailResult (Teach)
 
 ```ts

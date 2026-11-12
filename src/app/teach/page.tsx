@@ -1,8 +1,8 @@
 "use client";
-// Module 3 · Teaching: one click launches Torchbearer into an always-on-top floating window.
-// It first asks which saved, approved workflow the new hire wants to practise. They start recording and
-// works in any browser tab; matching steps are marked Learned, anything that might differ is never
-// called wrong: it's marked Relearn and goes under review for the supervisor (/review).
+// Training: the work assigned to you. Pick one, and one click launches Torchbearer into an always-on-top
+// floating window. You start recording and work in any browser tab; matching steps are marked Learned,
+// anything that might differ is never called wrong: it's marked Relearn and goes to review (/review).
+// Only workflows assigned to the signed-in person open here (the server checks).
 
 import { createPortal } from "react-dom";
 import { useEffect, useState, useSyncExternalStore } from "react";
@@ -12,8 +12,10 @@ import Launcher from "@/features/observe/Launcher";
 import { useCoach } from "@/features/observe/useCoach";
 import { pipSupported, usePip } from "@/features/observe/usePip";
 import { requestMic } from "@/lib/useVoiceAgent";
-import { EXAMPLE_ID, exampleSummary, exampleWorkflow, getWorkflow, listWorkflows } from "@/lib/session";
-import type { WorkflowRecord, WorkflowSummary } from "@/lib/types";
+import NoAccess from "@/features/nav/NoAccess";
+import { STATE_LABEL, dueText, stateOf, STATE_RANK, todayIso, type AssignmentState } from "@/lib/assignmentStatus";
+import { exampleWorkflow, getTrainingWorkflow } from "@/lib/session";
+import type { AssignmentView, WorkflowRecord, WorkflowSummary } from "@/lib/types";
 
 const readId = () => {
   try {
@@ -33,15 +35,17 @@ export default function TeachPage() {
 
 function Teach() {
   const idParam = useSyncExternalStore(() => () => {}, readId, () => null);
-  // From the database: every trained workflow, plus the prepared example.
-  const [workflows, setWorkflows] = useState<WorkflowSummary[]>([exampleSummary()]);
+  // What was assigned to the signed-in person.
+  const [assigned, setAssigned] = useState<AssignmentView[]>([]);
   const [listLoaded, setListLoaded] = useState(false);
   useEffect(() => {
-    listWorkflows().then((list) => {
-      setWorkflows([...list, exampleSummary()]);
-      setListLoaded(true);
-    });
+    fetch("/api/assignments?mine=1", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((a: AssignmentView[]) => setAssigned(a))
+      .catch(() => {})
+      .finally(() => setListLoaded(true));
   }, []);
+  const workflows: WorkflowSummary[] = assigned.map((a) => ({ id: a.workflowId, name: a.workflowName, createdAt: a.createdAt, published: true, stepCount: a.stepCount, trainedBy: a.trainedBy }));
   const [picked, setPickedState] = useState<string | null | undefined>(undefined); // undefined = use ?id
   const selectedId = picked === undefined ? idParam : picked;
   const setPicked = (id: string | null) => {
@@ -51,9 +55,14 @@ function Teach() {
     } catch {}
   };
   const [selectedRaw, setSelectedRaw] = useState<WorkflowRecord | null>(null);
+  const [denied, setDenied] = useState(false); // not assigned to this person
   useEffect(() => {
     let live = true;
-    getWorkflow(selectedId).then((w) => live && setSelectedRaw(w));
+    getTrainingWorkflow(selectedId).then(({ record, denied: refused }) => {
+      if (!live) return;
+      setSelectedRaw(record);
+      setDenied(refused);
+    });
     return () => {
       live = false;
     };
@@ -68,7 +77,7 @@ function Teach() {
   const notReady = selectedRaw && selectedRaw.id === selectedId && !selectedRaw.map.published;
   const startArea = !selected ? (
     <p className="text-[15px] text-[#475467]">
-      {notReady ? "This workflow isn't approved yet. Approve it in Workflows first." : "Loading the workflow…"}
+      {notReady ? "This workflow isn't approved yet." : "Loading the workflow…"}
     </p>
   ) : c.sharing ? (
     <div className="text-[15px]">
@@ -86,14 +95,15 @@ function Teach() {
     </div>
   );
 
-  // Training always starts from an approved workflow: without one, show the list to pick from.
-  if (!selectedId) return <WorkflowPicker workflows={workflows} loaded={listLoaded} onPick={setPicked} />;
+  // Training always starts from something assigned to you: without one picked, show your list.
+  if (!selectedId) return <AssignedList assigned={assigned} loaded={listLoaded} onPick={setPicked} />;
+  if (denied) return <NoAccess message="This workflow isn't assigned to you." backHref="/teach" backLabel="← Back to Training" />;
 
   return (
     <>
       <div className="bg-[#f3f2ff]">
         <div className="mx-auto max-w-3xl px-6 pt-4 text-[13.5px]">
-          <button onClick={() => setPicked(null)} className="text-[#667085] hover:text-indigo">← Choose a different workflow</button>
+          <button onClick={() => setPicked(null)} className="text-[#667085] hover:text-indigo">← Back to Training</button>
         </div>
       </div>
       <Launcher
@@ -119,39 +129,65 @@ function Teach() {
   );
 }
 
-/** The Training tab's first screen: approved workflows only, newest first. */
-function WorkflowPicker({ workflows, loaded, onPick }: { workflows: WorkflowSummary[]; loaded: boolean; onPick: (id: string) => void }) {
-  const approved = workflows.filter((w) => w.published && w.id !== EXAMPLE_ID).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+const STATE_STYLE: Record<AssignmentState, string> = {
+  none: "bg-[#eef0f3] text-[#475467]",
+  progress: "bg-indigo-soft text-indigo",
+  relearn: "bg-warn-soft text-[#7a5a00]",
+  done: "bg-ok-soft text-ok",
+  late: "bg-err-soft text-err",
+};
+const dayShort = (iso: string) => new Date(iso + "T00:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+
+/** The Training tab's first screen: the work assigned to you, what needs attention first. */
+function AssignedList({ assigned, loaded, onPick }: { assigned: AssignmentView[]; loaded: boolean; onPick: (id: string) => void }) {
+  const today = todayIso();
+  const list = [...assigned].sort((a, b) => STATE_RANK[stateOf(a, today)] - STATE_RANK[stateOf(b, today)] || (a.due ?? "9").localeCompare(b.due ?? "9"));
   return (
-    <div className="min-h-full bg-[linear-gradient(180deg,#f3f2ff_0%,#ffffff_45%)]">
-      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
-        <h1 className="text-[30px] font-light tracking-tight text-[#1f2d3d]">Training</h1>
-        <p className="mt-1 text-[15px] text-[#475467]">Pick an approved workflow to train a new hire on. TorchBearer coaches them the way your expert does it.</p>
+    <div className="min-h-full bg-[#f6f8fc]">
+      <div className="mx-auto max-w-[1240px] px-4 pb-10 sm:px-7">
+        <h1 className="pb-5 pt-6 text-[26px] font-medium leading-tight text-[#1f2d3d]">Training</h1>
+        <h2 className="mb-3 text-[13px] font-bold uppercase tracking-[.12em] text-[#667085]">Assigned to you</h2>
         {!loaded ? (
-          <p className="mt-8 text-[15px] text-[#667085]">Loading your workflows…</p>
-        ) : approved.length === 0 ? (
-          <div className="mt-8 rounded-md border border-dashed border-[#c9c6f5] bg-white p-8 text-center">
-            <h2 className="text-[18px] font-medium text-[#1f2d3d]">No approved workflows yet</h2>
-            <p className="mx-auto mt-2 max-w-md text-[15px] text-[#475467]">An expert records a workflow in Teaching, then someone approves it in Workflows. It shows up here once it&apos;s approved.</p>
-            <a href="/vault" className="mt-5 inline-flex h-10 items-center rounded-sm bg-indigo px-4 text-[15px] text-white hover:bg-indigo-dark">Go to Workflows</a>
-          </div>
+          <p className="text-[15px] text-[#667085]">Loading your training…</p>
+        ) : list.length === 0 ? (
+          <div className="rounded-md border border-line bg-white p-8 text-center text-[15px] text-[#475467]">Nothing assigned yet. Your supervisor will give you a workflow here.</div>
         ) : (
-          <ul className="mt-6 grid gap-3 md:grid-cols-2">
-            {approved.map((w) => (
-              <li key={w.id} className="flex flex-col rounded-md border border-line bg-white p-4 shadow-[0_4px_14px_rgba(16,24,40,.04)]">
-                <h2 className="text-[16.5px] font-medium leading-snug text-[#1f2d3d]">{w.name || "Untitled workflow"}</h2>
-                <p className="mt-1 text-[13.5px] text-[#667085]">
-                  {w.stepCount} step{w.stepCount === 1 ? "" : "s"}
-                  {w.trainedBy ? ` · taught by ${w.trainedBy}` : ""}
-                </p>
-                <button
-                  onClick={() => onPick(w.id)}
-                  className="mt-4 inline-flex h-9 w-fit items-center rounded-sm bg-indigo px-3 text-[14px] text-white hover:bg-indigo-dark"
-                >
-                  Start training
-                </button>
-              </li>
-            ))}
+          <ul className="flex flex-col gap-3">
+            {list.map((a) => {
+              const st = stateOf(a, today);
+              const done = st === "done";
+              return (
+                <li key={a.id} className={`grid items-center gap-4 rounded-md border border-line border-l-4 bg-white p-4 shadow-[0_4px_14px_rgba(16,24,40,.04)] sm:grid-cols-[minmax(0,1fr)_auto] ${st === "late" ? "border-l-err" : done ? "border-l-ok" : "border-l-indigo"}`}>
+                  <div className="min-w-0">
+                    <h3 className="text-[17px] font-medium text-[#1f2d3d]">{a.workflowName}</h3>
+                    <p className="mb-2 mt-0.5 text-[13.5px] text-[#667085]">
+                      {a.stepCount} step{a.stepCount === 1 ? "" : "s"}
+                      {a.trainedBy ? ` · taught by ${a.trainedBy}` : ""}
+                      {a.due && !done && (
+                        <>
+                          {" · "}
+                          <b className={`font-medium ${st === "late" ? "text-err" : ""}`}>{dueText(a.due, today)}</b> ({dayShort(a.due)})
+                        </>
+                      )}
+                    </p>
+                    {a.note && <p className="mb-2.5 rounded-md bg-indigo-soft px-2.5 py-1.5 text-[14px] text-[#3b3399]"><b className="font-medium">From your supervisor:</b> {a.note}</p>}
+                    <div className="max-w-[360px]">
+                      <div className="h-1.5 overflow-hidden rounded-[3px] bg-[#eceef1]"><i className="block h-full bg-indigo" style={{ width: `${Math.min(100, Math.round((a.learned / Math.max(1, a.stepCount)) * 100))}%` }} /></div>
+                      <small className="mt-1 block text-[12.5px] text-[#667085]">{a.learned}/{a.stepCount} learned{a.relearn ? ` · ${a.relearn} to relearn` : ""}</small>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-start gap-1.5 sm:items-end">
+                    <span className={`rounded-full px-2.5 py-0.5 text-[12.5px] font-medium ${STATE_STYLE[st]}`}>{STATE_LABEL[st]}</span>
+                    <button
+                      onClick={() => onPick(a.workflowId)}
+                      className={done ? "h-9 rounded-sm border border-line px-3 text-[14px] text-[#344054] hover:bg-panel" : "h-10 rounded-sm bg-indigo px-5 text-[15px] text-white hover:bg-indigo-dark"}
+                    >
+                      {done ? "Practise again" : a.learned || a.relearn ? (a.relearn ? `Relearn ${a.relearn} step${a.relearn === 1 ? "" : "s"}` : "Continue") : "Start"}
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>

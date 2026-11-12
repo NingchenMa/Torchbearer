@@ -1,5 +1,6 @@
 // Shared data formats. Source of truth: docs/formats.md — change both together.
 // The work app is the Ledgerline expense tool (public/ledgerline.html).
+import type { Role } from "./roles";
 
 /** What the Ledgerline mock sends with save / form events (its `snapshot()`). */
 export interface ExpenseSnapshot {
@@ -107,6 +108,7 @@ export interface ReviewItem {
   comment?: string;
   workflowId?: string;
   stepId?: string;
+  stepLabel?: string; // e.g. "Step 5 · Attach approval", for the reviewer
 }
 
 /** A recorded workflow, saved under the name the expert gave it. */
@@ -115,6 +117,8 @@ export interface WorkflowRecord {
   name: string;
   createdAt: string;
   map: WorkMap;
+  /** Cognito user ID of whoever recorded it. Set by the server on first save, never by the browser. */
+  ownerId?: string;
 }
 
 /** What the workflow list shows (the full record is loaded on demand). */
@@ -124,13 +128,54 @@ export interface WorkflowSummary {
   createdAt: string;
   published: boolean;
   stepCount: number;
-  /** Who recorded it (the signed-in expert's name), when known. */
+  /** Who recorded it (the signed-in expert's name), for display. */
   trainedBy?: string;
+  /** Cognito user ID of the recorder; access is decided by this, not the name. Missing on workflows saved before owners existed. */
+  ownerId?: string;
 }
 
-/** The supervisor's review batch for one learner. */
+/** Someone in the company: kept so managers can pick people to assign work to. */
+export interface Member {
+  id: string; // Cognito user ID
+  name: string;
+  email: string;
+  role: Role;
+  /** The company's own ID for this person. Required when an admin adds someone; people who signed in before it existed have none. */
+  employeeId?: string;
+}
+
+/** A workflow a manager gave to an employee to train on. Stored in assignments/index.json. */
+export interface Assignment {
+  id: string;
+  workflowId: string;
+  learnerId: string; // Cognito user ID
+  learnerName: string;
+  assignedById: string;
+  assignedByName: string;
+  due?: string; // "YYYY-MM-DD"
+  note?: string; // shown to the employee in Training
+  createdAt: string;
+}
+
+/** An assignment with the workflow's details and how far the employee has got. */
+export interface AssignmentView extends Assignment {
+  workflowName: string;
+  /** Who recorded the workflow, for display. */
+  trainedBy?: string;
+  stepCount: number;
+  learned: number;
+  relearn: number;
+}
+
+/**
+ * The review items from one person's practice on one workflow. Stored per workflow and learner
+ * (reviews/<workflow>/<learner id>.json). Seen by managers, admins, and the person who recorded the workflow.
+ */
 export interface ReviewBatch {
-  learner: string;
+  learner: string; // display name
+  learnerId: string; // Cognito user ID
+  workflowId: string;
+  workflowName: string;
   items: ReviewItem[];
   submitted: boolean;
 }

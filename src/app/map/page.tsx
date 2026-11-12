@@ -8,7 +8,8 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import ExportDialog from "@/features/workmap/ExportDialog";
 import { TypeChip, guardrailType } from "@/features/workmap/WorkMapView";
-import { EXAMPLE_ID, exampleWorkflow, getWorkflow, listWorkflows, saveWorkflow } from "@/lib/session";
+import NoAccess from "@/features/nav/NoAccess";
+import { EXAMPLE_ID, exampleWorkflow, getWorkflowAccess, listWorkflows, saveWorkflow } from "@/lib/session";
 import type { WorkflowSummary } from "@/lib/types";
 import type { WorkflowRecord, WorkMapStep } from "@/lib/types";
 
@@ -31,6 +32,7 @@ export default function MappingPage() {
   const [record, setRecord] = useState<WorkflowRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [denied, setDenied] = useState(false); // the server refused: not the recorder, not a manager
   const [attempt, setAttempt] = useState(0); // bumped by Retry to load again
   const [saveState, setSaveState] = useState<"saved" | "saving" | "error">("saved");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -41,12 +43,13 @@ export default function MappingPage() {
       if (!live) return;
       setLibrary(list);
       const wanted = idParam ?? list[0]?.id;
-      const loaded = await getWorkflow(wanted);
+      const { record: loaded, denied: refused } = await getWorkflowAccess(wanted);
       if (!live) return;
+      setDenied(refused);
       // A real workflow that didn't load is an error, never a silent switch to the prepared example
       // (that looks like the recording vanished). The example only shows when nothing is recorded yet.
       if (loaded || !wanted) setRecord(loaded ?? exampleWorkflow());
-      setLoadFailed(!loaded && !!wanted);
+      setLoadFailed(!loaded && !!wanted && !refused);
       setLoading(false);
     });
     return () => {
@@ -128,17 +131,18 @@ export default function MappingPage() {
   if (loading) {
     return <div className="grid min-h-full place-items-center bg-[#f6f8fc] text-[15px] text-[#667085]">Loading the workflow from the database…</div>;
   }
+  if (denied) return <NoAccess message="You lack permission to edit or review this workflow." />;
   if (loadFailed) {
     return (
       <div className="grid min-h-full place-items-center bg-[#f6f8fc] p-6 text-center">
         <div className="max-w-md">
           <div className="text-[22px] font-light text-[#1f2d3d]">Couldn&apos;t load this workflow</div>
           <p className="mt-2 text-[15px] text-[#667085]">
-            The connection may have dropped or your sign-in may have ended. Nothing was deleted. Try again, or open the workflow from the vault.
+            The connection may have dropped or your sign-in may have ended. Nothing was deleted. Try again, or open the workflow from Workflows.
           </p>
           <div className="mt-5 flex justify-center gap-3">
             <button onClick={retryLoad} className="h-11 rounded-sm bg-indigo px-5 text-[15px] text-white hover:bg-indigo-dark">Try again</button>
-            <Link href="/vault" className="inline-flex h-11 items-center rounded-sm border border-indigo bg-white px-5 text-[15px] text-indigo hover:bg-indigo-soft">← Vault</Link>
+            <Link href="/vault" className="inline-flex h-11 items-center rounded-sm border border-indigo bg-white px-5 text-[15px] text-indigo hover:bg-indigo-soft">← Workflows</Link>
           </div>
         </div>
       </div>
@@ -151,7 +155,7 @@ export default function MappingPage() {
         <div className="pointer-events-none absolute -right-32 -top-40 h-[440px] w-[440px] rounded-full bg-indigo/10 blur-3xl" aria-hidden="true" />
         <div className="relative mx-auto max-w-6xl px-6 pb-8 pt-6">
           <div className="mb-4 flex flex-wrap items-center gap-3 text-[13.5px]">
-            <Link href="/vault" className="text-[#667085] hover:text-indigo">← Vault</Link>
+            <Link href="/vault" className="text-[#667085] hover:text-indigo">← Workflows</Link>
             <span className="ml-auto text-[#667085]">Workflow</span>
             <select value={wf.id} onChange={(e) => switchTo(e.target.value)} className="h-9 max-w-xs rounded-sm border border-[#9aa0a6] bg-white px-2 text-[14px] focus:border-indigo focus:outline-none">
               {library.map((w) => (
