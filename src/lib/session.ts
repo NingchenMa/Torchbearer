@@ -149,13 +149,13 @@ export async function saveMastery(workflowId: string, patch: Record<string, Step
 }
 
 /** A workflow the signed-in person was assigned, to practise on (managers and recorders use getWorkflow). */
-export async function getTrainingWorkflow(id: string | null | undefined): Promise<WorkflowRecord | null> {
-  if (!id) return null;
+export async function getTrainingWorkflow(id: string | null | undefined): Promise<{ record: WorkflowRecord | null; denied: boolean }> {
+  if (!id) return { record: null, denied: false };
   try {
     const r = await fetch(`/api/workflows/${encodeURIComponent(id)}/train`, { cache: "no-store" });
-    return r.ok ? await r.json() : null;
+    return { record: r.ok ? await r.json() : null, denied: r.status === 403 };
   } catch {
-    return null;
+    return { record: null, denied: false };
   }
 }
 
