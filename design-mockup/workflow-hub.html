@@ -562,8 +562,9 @@ function renderWorkflows() {
           : `<button class="btn sm ind" data-approve="${w.id}">Review and approve</button>`}
         <a class="btn sm plain" href="#process" data-process="${w.id}">Process map</a>
         <button class="del" data-ask="${w.id}" aria-label="Delete ${esc(w.name)}">Delete</button>`
-      : `${w.published ? `<button class="btn sm pri" data-toast="Asks a manager to assign this workflow (placeholder, see permissions.md)">Train a new hire</button>` : ""}
-        <a class="btn sm plain" href="#" data-toast="Opens the Work Map">View Work Map</a>
+      : `${w.published
+          ? `<button class="btn sm pri" data-toast="Only managers can assign workflows. Ask a manager to give this one to a new hire.">Train a new hire</button><a class="btn sm plain" href="#" data-toast="Opens the Work Map">View Work Map</a>`
+          : `<a class="btn sm ind" href="#" data-toast="Opens the Work Map, where you review and approve it">Review and approve</a>`}
         <a class="btn sm plain" href="#process" data-process="${w.id}">Process map</a>`;
     return `<li class="wf">
       <div class="wf-top"><h3>${esc(w.name)}</h3><span class="wtag ${w.published ? "" : "warn"}">${w.published ? "Ready to teach" : "Needs approval"}</span></div>
