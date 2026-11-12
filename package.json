@@ -10,6 +10,7 @@
     "agents": "node scripts/agents.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.1162.0",
     "@aws-sdk/client-s3": "^3.1162.0",
     "@elevenlabs/react": "^1.16.0",
     "aws-jwt-verify": "^5.2.1",

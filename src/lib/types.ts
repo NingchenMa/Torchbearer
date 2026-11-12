@@ -140,6 +140,8 @@ export interface Member {
   name: string;
   email: string;
   role: Role;
+  /** The company's own ID for this person. Required when an admin adds someone; people who signed in before it existed have none. */
+  employeeId?: string;
 }
 
 /** A workflow a manager gave to an employee to train on. Stored in assignments/index.json. */
