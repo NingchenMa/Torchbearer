@@ -1,5 +1,6 @@
 // GET  /api/assignments  managers and admins: every assignment at the company, with progress.
-//                        employees: only the ones given to them (this is what Training lists).
+//                        employees: only the ones given to them.
+// GET  /api/assignments?mine=1   only the ones given to the signed-in person, whatever their role (Training lists these).
 // POST /api/assignments  { workflowId, learnerIds, due?, note? }: give a workflow to people. Managers and admins only.
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
@@ -12,11 +13,12 @@ import { WORKFLOW_INDEX } from "@/lib/workflows";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: Request) {
   const u = await requireUser();
   if (u instanceof NextResponse) return u;
   const all = await readAssignments(u.org);
-  return NextResponse.json(await withProgress(u.org, canAssign(u) ? all : all.filter((a) => a.learnerId === u.id)));
+  const everyone = canAssign(u) && !new URL(req.url).searchParams.get("mine");
+  return NextResponse.json(await withProgress(u.org, everyone ? all : all.filter((a) => a.learnerId === u.id)));
 }
 
 export async function POST(req: Request) {
