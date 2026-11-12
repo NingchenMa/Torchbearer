@@ -1,5 +1,5 @@
 "use client";
-// The floating Torchbearer in Teaching mode. First it asks which saved workflow to practise.
+// The floating Torchbearer in Training mode. First it asks which saved workflow to practise.
 // Then: the workflow's steps with Learned ✓ / Relearn ↺ (this session, or from last time),
 // the latest gentle guidance, and Start / Stop recording.
 
