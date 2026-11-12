@@ -5,7 +5,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { BotFace } from "@/features/observe/Launcher";
+import { TorchMark } from "@/features/nav/TorchMark";
 
 interface Me {
   email: string;
@@ -39,16 +39,14 @@ export default function AppNav() {
 
   if (hidden) return null;
   return (
-    <header className="shrink-0 border-b border-line bg-white">
+    <header className="tb-hero shrink-0 border-b border-maroon-3">
       <div className="mx-auto flex max-w-6xl items-center gap-2 px-3 sm:gap-4 sm:px-6">
-        <Link prefetch={false} href="/vault" className="flex shrink-0 items-center gap-2 py-2" aria-label="TorchBearer, workflow vault">
-          <span className="grid h-8 w-8 place-items-center rounded-[9px] bg-indigo">
-            <BotFace size={22} />
-          </span>
+        <Link prefetch={false} href="/vault" className="flex shrink-0 items-center gap-2.5 py-2" aria-label="TorchBearer, workflow vault">
+          <TorchMark size={30} />
           <span className="hidden leading-tight md:block">
-            <span className="block text-[15px] font-medium text-[#1f2d3d]">TorchBearer</span>
+            <span className="block font-display text-[19px] text-blush">TorchBearer</span>
             {me && me.org !== "torchbearer" && (
-              <span className="block max-w-[160px] truncate text-[12px] text-[#667085]">{companyName(me.org)}</span>
+              <span className="block max-w-[160px] truncate font-serif text-[12.5px] italic text-amber">{companyName(me.org)}</span>
             )}
           </span>
         </Link>
@@ -62,19 +60,19 @@ export default function AppNav() {
                 prefetch={false}
                 href={t.href}
                 aria-current={active ? "page" : undefined}
-                className={`relative px-2.5 py-2.5 text-center sm:px-5 ${active ? "text-indigo" : "text-[#475467] hover:text-[#1f2d3d]"}`}
+                className={`relative px-2.5 py-2.5 text-center transition-colors sm:px-5 ${active ? "text-white" : "text-blush-2 hover:text-white"}`}
               >
-                <span className={`block text-[14.5px] sm:text-[15px] ${active ? "font-medium" : ""}`}>{t.label}</span>
-                <span className="hidden text-[12px] text-[#98a2b3] sm:block">{t.hint}</span>
-                {active && <span className="absolute inset-x-2 bottom-0 h-[3px] rounded-t bg-indigo" aria-hidden="true" />}
+                <span className={`block text-[14.5px] sm:text-[15px] ${active ? "font-bold" : ""}`}>{t.label}</span>
+                <span className={`hidden font-serif text-[12px] italic sm:block ${active ? "text-amber" : "text-blush-2/70"}`}>{t.hint}</span>
+                {active && <span className="absolute inset-x-3 bottom-0 h-[3px] rounded-t-full bg-amber shadow-[0_0_12px_rgba(242,160,7,.7)]" aria-hidden="true" />}
               </Link>
             );
           })}
         </nav>
 
         <div className="flex shrink-0 items-center gap-3">
-          {me && <span className="hidden max-w-[200px] truncate text-[13px] text-[#475467] lg:inline">{me.email}</span>}
-          <a href="/api/auth/logout" className="text-[13px] text-[#667085] hover:text-indigo">Sign out</a>
+          {me && <span className="hidden max-w-[200px] truncate text-[13px] text-blush-2 lg:inline">{me.email}</span>}
+          <a href="/api/auth/logout" className="rounded-full border border-blush-2/50 px-3 py-1 text-[13px] text-blush transition hover:border-blush hover:bg-white/5">Sign out</a>
         </div>
       </div>
     </header>

@@ -73,6 +73,23 @@ export interface WorkMapStep {
   expertQuote: string;
   guardrails: string[];
   process?: StepProcess; // filled in by the process map (/process)
+  answers?: StepAnswer[]; // the expert's answers to the process map's open questions (kept across rebuilds)
+  addedBy?: string; // set when someone added this step by hand on the process canvas (email); it has no recording
+}
+export interface CanvasNote {
+  id: string;
+  text: string;
+  x: number;
+  y: number;
+  stepId?: string; // the step this note is connected to, if any
+  by?: string; // who wrote it (email)
+  at?: string; // ISO time
+}
+export interface StepAnswer {
+  q: string; // the question as it was asked
+  a: string; // the expert's answer
+  by: string; // who typed it (email)
+  at: string; // ISO time
 }
 
 /** Process map: how one step fits the whole process (tools, data in and out, links to other steps). */
@@ -152,6 +169,9 @@ export interface WorkMap {
   offRecord?: { from: string; to: string }[]; // "mm:ss" ranges the expert took off the record (shown as gaps)
   published?: boolean; // expert approved the map; Teaching mode uses only published maps
   processBuiltAt?: string; // ISO time the process map was last built
+  layout?: Record<string, { x: number; y: number }>; // process map boxes the user moved on the canvas (node id → position)
+  flow?: { source: string; target: string }[]; // process map arrows as the user edited them (node ids; "start", "end", step ids, "rule-<step id>")
+  notes?: CanvasNote[]; // sticky notes on the process map canvas
 }
 
 export type RuleKey = "approval" | "delivery_docs";

@@ -2,8 +2,8 @@
 // The screenshot-only Torchbearer loop:
 //   watch    every second a frame; changed frames go to /api/observe with the workflow so far
 //   write    the LLM returns what happened + the updated workflow (+ maybe a question)
-//   ask      a question is spoken only at a pause: screen still ≥ 3 s, nobody talking,
-//            ≥ 15 s since the last question
+//   ask      a question is spoken at the next short pause: screen still ≥ 2 s, nobody talking,
+//            and the last question already answered (or the expert has moved on)
 //   learn    the spoken answer is paired with its question and written into the workflow
 //            right away by a fast text-only call (why / rule on the right step)
 // Must be used inside <ConversationProvider>.
@@ -15,9 +15,8 @@ import { requestMic, useVoiceAgent } from "@/lib/useVoiceAgent";
 import type { ObservedStep, ObserveQA, TranscriptLine } from "@/lib/types";
 import { ScreenWatcher, friendly, shareErrorText, type Frame } from "./screenWatcher";
 
-const PAUSE_MS = 3000;
-const MIN_GAP_MS = 15000;
-const IDLE_MS = 12000; // screen still, nobody talking, nothing to ask: ask what happened
+const PAUSE_MS = 2000;
+const IDLE_MS = 8000; // how long screen and voice must both be still to count as "stopped"
 
 export type ObserverStatus = "idle" | "connecting" | "watching" | "reading" | "asking" | "off_record" | "debrief" | "building";
 
@@ -113,6 +112,12 @@ export function useObserver(onWorkMapReady: (workflowId: string) => void) {
     return () => ctrl.abort();
   }, [qa]);
 
+  /** A new question is fine once the expert answered the last one (spoke after it) or went on working. */
+  function answeredOrMovedOn(lastSpeech: number) {
+    const asked = lastQuestionAt.current;
+    return !asked || lastSpeech > asked || watcher.current.lastChange > asked;
+  }
+
   async function onFrame(f: Frame) {
     const l = live.current;
     if (l.offRecord || l.phase !== "task") return; // recording stopped: no more screens to the AI
@@ -130,7 +135,7 @@ export function useObserver(onWorkMapReady: (workflowId: string) => void) {
       const res = await fetch("/api/observe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ frame: f.dataUrl, previous: lastSent.current, workflow: l.workflow, actions: actionsRef.current, qa: l.qa, asked: asked.current, now }),
+        body: JSON.stringify({ task: workflowName.current, frame: f.dataUrl, previous: lastSent.current, workflow: l.workflow, actions: actionsRef.current, qa: l.qa, asked: asked.current, now }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -168,7 +173,7 @@ export function useObserver(onWorkMapReady: (workflowId: string) => void) {
       if (!q || l.offRecord || l.agent.isSpeaking) return;
       if (now - watcher.current.lastChange < PAUSE_MS) return; // still working on screen
       if (now - l.agent.lastUserSpeech.current < 2500) return; // still talking
-      if (now - lastQuestionAt.current < MIN_GAP_MS) return; // question budget
+      if (!answeredOrMovedOn(l.agent.lastUserSpeech.current)) return; // don't stack questions
       l.agent.sendUserMessage(`[ASK] ${q}`);
       asked.current.push(q);
       pending.current = null;
@@ -187,7 +192,7 @@ export function useObserver(onWorkMapReady: (workflowId: string) => void) {
       if (pending.current || l.offRecord || l.agent.isSpeaking) return;
       if (idleAsked.current > Math.max(watcher.current.lastChange, l.agent.lastUserSpeech.current)) return; // already asked during this stop
       const quietSince = Math.max(watcher.current.lastChange, l.agent.lastUserSpeech.current, lastQuestionAt.current);
-      if (now - quietSince < IDLE_MS || now - lastQuestionAt.current < MIN_GAP_MS) return;
+      if (now - quietSince < IDLE_MS || !answeredOrMovedOn(l.agent.lastUserSpeech.current)) return;
       const last = actionsRef.current[actionsRef.current.length - 1];
       l.agent.sendUserMessage(
         `[IDLE] The expert has stopped and gone quiet for ${Math.round((now - quietSince) / 1000)} seconds${last ? `, right after: ${last.text}` : ""}. Ask one short question about what happened or why they stopped.`,

@@ -14,6 +14,8 @@ import { pipSupported, usePip } from "@/features/observe/usePip";
 import { requestMic } from "@/lib/useVoiceAgent";
 import { EXAMPLE_ID, exampleSummary, exampleWorkflow, getWorkflow, listWorkflows } from "@/lib/session";
 import type { WorkflowRecord, WorkflowSummary } from "@/lib/types";
+import { ArrowRight } from "lucide-react";
+import { Spotlight, StepTrail, Torch } from "@/features/ui/fx";
 
 const readId = () => {
   try {
@@ -78,7 +80,7 @@ function Teach() {
   ) : (
     <div className="flex flex-col gap-2">
       <div className="text-[15px]">Practising: <b>{selected.name}</b></div>
-      <button onClick={c.start} className="h-11 rounded-sm bg-indigo text-[16px] text-white hover:bg-indigo-dark">
+      <button onClick={c.start} className="tb-btn-amber h-12 w-full text-[16px]">
         {c.finished ? "● Practise again" : "● Start recording"}
       </button>
       <p className="text-[13px] text-[#667085]">Chrome will ask what to share: choose <b>Entire screen</b>.</p>
@@ -91,15 +93,23 @@ function Teach() {
 
   return (
     <>
-      <div className="bg-[#f3f2ff]">
-        <div className="mx-auto max-w-3xl px-6 pt-4 text-[13.5px]">
-          <button onClick={() => setPicked(null)} className="text-[#667085] hover:text-indigo">← Choose a different workflow</button>
+      <div className="bg-maroon-3">
+        <div className="mx-auto max-w-6xl px-6 pt-4 text-[14px]">
+          <button onClick={() => setPicked(null)} className="text-blush-2 transition-colors hover:text-amber">← Choose a different workflow</button>
         </div>
       </div>
       <Launcher
-        eyebrow={selected ? `Training · ${selected.name}` : "Training"}
-        title={<>Torchbearer <span className="font-medium text-indigo">guides the new hire</span></>}
-        text="Launch it and it floats on the new hire's screen. They start and work as usual. Torchbearer marks each step learned or to relearn, and anything that might differ goes to their supervisor, never called wrong."
+        eyebrow="Training · coach a new hire"
+        title={
+          selected ? (
+            <>
+              Train a new hire on <span className="font-serif italic text-amber">{selected.name}.</span>
+            </>
+          ) : (
+            <>Train a new hire.</>
+          )
+        }
+        text={`TorchBearer floats on the new hire's screen and coaches them through ${selected ? `all ${selected.map.steps.length} steps` : "each step"} the way your expert does it. Each step is marked learned or to practise again; anything that differs goes to their supervisor, never marked wrong.`}
         launched={pip.isOpen}
         canPip={canPip}
         failed={pip.failed}
@@ -123,34 +133,67 @@ function Teach() {
 function WorkflowPicker({ workflows, loaded, onPick }: { workflows: WorkflowSummary[]; loaded: boolean; onPick: (id: string) => void }) {
   const approved = workflows.filter((w) => w.published && w.id !== EXAMPLE_ID).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
   return (
-    <div className="min-h-full bg-[linear-gradient(180deg,#f3f2ff_0%,#ffffff_45%)]">
-      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
-        <h1 className="text-[30px] font-light tracking-tight text-[#1f2d3d]">Training</h1>
-        <p className="mt-1 text-[15px] text-[#475467]">Pick an approved workflow to train a new hire on. TorchBearer coaches them the way your expert does it.</p>
+    <div className="min-h-full bg-cream">
+      <section className="tb-hero relative overflow-hidden">
+        <div className="relative mx-auto flex max-w-6xl items-center justify-between gap-6 px-6 py-10">
+          <div className="tb-rise">
+            <p className="text-[12px] font-bold uppercase tracking-[.16em] text-amber">Training · coach a new hire</p>
+            <h1 className="mt-3 font-display text-[40px] leading-[1.05] text-blush sm:text-[50px]">
+              Which task <span className="font-serif italic text-amber">are they learning?</span>
+            </h1>
+            <p className="mt-3 max-w-xl text-[16px] text-blush-2">
+              {!loaded
+                ? "Loading your workflows…"
+                : approved.length
+                ? `${approved.length} approved workflow${approved.length === 1 ? "" : "s"} ready. Pick one and TorchBearer coaches the new hire through it the way your expert does it.`
+                : "No workflow is approved yet."}
+            </p>
+          </div>
+          <div className="hidden md:block">
+            <Torch size={170} />
+          </div>
+        </div>
+      </section>
+      <div className="mx-auto max-w-6xl px-6 py-8">
         {!loaded ? (
-          <p className="mt-8 text-[15px] text-[#667085]">Loading your workflows…</p>
+          <p className="text-[16px] text-muted">Loading your workflows…</p>
         ) : approved.length === 0 ? (
-          <div className="mt-8 rounded-md border border-dashed border-[#c9c6f5] bg-white p-8 text-center">
-            <h2 className="text-[18px] font-medium text-[#1f2d3d]">No approved workflows yet</h2>
-            <p className="mx-auto mt-2 max-w-md text-[15px] text-[#475467]">An expert records a workflow in Teaching, then someone approves it in Workflows. It shows up here once it&apos;s approved.</p>
-            <a href="/vault" className="mt-5 inline-flex h-10 items-center rounded-sm bg-indigo px-4 text-[15px] text-white hover:bg-indigo-dark">Go to Workflows</a>
+          <div className="rounded-lg border border-line bg-white p-10 text-center">
+            <h2 className="font-display text-[28px] text-ink">
+              Nothing to train on <span className="font-serif italic text-crimson">yet.</span>
+            </h2>
+            <p className="mx-auto mt-3 max-w-md text-[16px] text-muted">An expert records a workflow in Teaching, then someone approves it in Workflows. It shows up here once it&apos;s approved.</p>
+            <a href="/vault" className="tb-btn-amber mt-6 h-11">Go to Workflows</a>
           </div>
         ) : (
-          <ul className="mt-6 grid gap-3 md:grid-cols-2">
-            {approved.map((w) => (
-              <li key={w.id} className="flex flex-col rounded-md border border-line bg-white p-4 shadow-[0_4px_14px_rgba(16,24,40,.04)]">
-                <h2 className="text-[16.5px] font-medium leading-snug text-[#1f2d3d]">{w.name || "Untitled workflow"}</h2>
-                <p className="mt-1 text-[13.5px] text-[#667085]">
-                  {w.stepCount} step{w.stepCount === 1 ? "" : "s"}
-                  {w.trainedBy ? ` · taught by ${w.trainedBy}` : ""}
-                </p>
-                <button
-                  onClick={() => onPick(w.id)}
-                  className="mt-4 inline-flex h-9 w-fit items-center rounded-sm bg-indigo px-3 text-[14px] text-white hover:bg-indigo-dark"
-                >
-                  Start training
-                </button>
-              </li>
+          <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {approved.map((w, k) => (
+              <Spotlight
+                as="li"
+                key={w.id}
+                style={{ animationDelay: `${Math.min(k, 9) * 60}ms` }}
+                className="tb-rise flex flex-col rounded-lg border border-line bg-white p-5 transition-[transform,box-shadow] duration-300 ease-out hover:-translate-y-1 hover:shadow-[0_18px_40px_rgba(58,11,20,.12)]"
+              >
+                <h2 className="font-display text-[22px] leading-tight text-ink [text-wrap:balance]">{w.name || "Untitled workflow"}</h2>
+                <div className="mt-4">
+                  <StepTrail count={w.stepCount} lit />
+                  <p className="mt-2 text-[14px] text-muted">
+                    {w.stepCount} step{w.stepCount === 1 ? "" : "s"}
+                    {w.trainedBy ? (
+                      <>
+                        {" · taught by "}
+                        <span className="font-serif italic text-crimson">{w.trainedBy}</span>
+                      </>
+                    ) : null}
+                  </p>
+                </div>
+                <div className="mt-auto border-t border-line pt-4">
+                  <button onClick={() => onPick(w.id)} className="tb-btn-dark group/btn h-10">
+                    Start training
+                    <ArrowRight size={16} className="transition-transform duration-200 group-hover/btn:translate-x-1" aria-hidden="true" />
+                  </button>
+                </div>
+              </Spotlight>
             ))}
           </ul>
         )}

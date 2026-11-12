@@ -1,26 +1,39 @@
 @import "tailwindcss";
 
-/* Enterprise look matching Ledgerline: white, Roboto, blue #2F74D0, grey panels, thin borders, 3px radius.
-   Indigo marks the Apprentice itself, so it never looks like part of Ledgerline. */
+/* TorchBearer look, matching the product website: deep maroon, Libre Caslon serif headings,
+   crimson italic accents, amber pill buttons, warm off-white cards, Lato for reading text.
+   The Ledgerline sample site keeps its own blue enterprise look (brand tokens), so it never
+   looks like part of TorchBearer. "indigo" is the historic name of the TorchBearer accent. */
 @theme inline {
-  --font-sans: var(--font-roboto), "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-sans: var(--font-lato), "Segoe UI", system-ui, sans-serif;
+  --font-display: var(--font-caslon-display), Georgia, Cambria, "Times New Roman", serif;
+  --font-serif: var(--font-caslon-text), Georgia, Cambria, serif;
   --color-brand: #2f74d0;
   --color-brand-dark: #1f4e8c;
   --color-brand-soft: #e3f0fc;
-  --color-ink: #212121;
-  --color-muted: #6b7280;
-  --color-panel: #f8f8f8;
+  --color-ink: #241a1c;
+  --color-muted: #6f6265;
+  --color-panel: #f8f2f3;
   --color-panel-2: #f6f7f9;
-  --color-line: #e3e3e3;
+  --color-line: #ded4d5;
   --color-ok: #2e7d4f;
   --color-ok-soft: #e3f2e8;
   --color-warn: #e2a100;
   --color-warn-soft: #fff6db;
   --color-err: #c62828;
   --color-err-soft: #fdecec;
-  --color-indigo: #5146d9;
-  --color-indigo-dark: #3f35b8;
-  --color-indigo-soft: #f1f0ff;
+  --color-indigo: #a4161a;
+  --color-indigo-dark: #7a0f13;
+  --color-indigo-soft: #f8f2f3;
+  --color-maroon: #3a0b14;
+  --color-maroon-2: #5a1220;
+  --color-maroon-3: #2a070e;
+  --color-crimson: #a4161a;
+  --color-amber: #f2a007;
+  --color-amber-dark: #d68b00;
+  --color-blush: #f4e9ea;
+  --color-blush-2: #ddbdc2;
+  --color-cream: #f8f2f3;
   --radius-sm: 3px;
 }
 
@@ -31,6 +44,7 @@ body {
 
 body {
   background: #fff;
+  line-height: 1.5;
   color: var(--color-ink);
   font-size: 15px;
 }
@@ -82,4 +96,147 @@ body {
 @keyframes loadbar {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(300%); }
+}
+
+/* Process diagram motion (off for reduced-motion users) */
+@keyframes pd-flow { to { stroke-dashoffset: -28; } }
+@keyframes pd-pop {
+  from { opacity: 0; transform: translateY(10px) scale(.97); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes pd-ring {
+  0% { box-shadow: 0 0 0 0 rgba(81,70,217,.45); }
+  100% { box-shadow: 0 0 0 14px rgba(81,70,217,0); }
+}
+.pd-flow { stroke-dasharray: 6 22; animation: pd-flow 1.4s linear infinite; }
+.pd-pop { animation: pd-pop .5s cubic-bezier(.2,.7,.2,1) both; }
+.pd-ring { animation: pd-ring 1.8s ease-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .pd-flow { animation: none; stroke-dasharray: none; opacity: 0; }
+  .pd-pop, .pd-ring { animation: none; }
+}
+
+/* Website building blocks */
+@layer components {
+  .tb-hero {
+    background: radial-gradient(900px 600px at 22% 30%, #5a1220 0%, #3a0b14 48%, #2a070e 100%);
+    color: #f4e9ea;
+  }
+  .tb-eyebrow {
+    @apply text-[12px] font-bold uppercase tracking-[.16em] text-crimson;
+  }
+  .tb-btn-amber {
+    @apply inline-flex h-10 items-center justify-center gap-2 rounded-full bg-amber px-5 text-[14.5px] font-bold text-maroon-3 transition-[background-color,box-shadow] hover:bg-amber-dark hover:shadow-[0_6px_18px_rgba(242,160,7,.35)] disabled:opacity-50;
+  }
+  .tb-btn-ghost {
+    @apply inline-flex h-10 items-center justify-center gap-2 rounded-full border border-blush-2/50 px-5 text-[14.5px] text-blush transition-[border-color,background-color] hover:border-blush hover:bg-white/5;
+  }
+  .tb-btn-line {
+    @apply inline-flex h-9 items-center justify-center gap-2 rounded-full border border-line bg-white px-4 text-[14px] text-ink transition-[border-color,background-color] hover:border-crimson/40 hover:bg-cream;
+  }
+  .tb-btn-dark {
+    @apply inline-flex h-9 items-center justify-center gap-2 rounded-full bg-maroon px-4 text-[14px] font-bold text-blush transition-colors hover:bg-maroon-2;
+  }
+}
+
+/* Shared effects for the TorchBearer pages (src/features/ui/fx.tsx) */
+.tb-spot {
+  position: relative;
+  isolation: isolate;
+}
+.tb-spot::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  z-index: -1;
+  opacity: 0;
+  transition: opacity .3s ease-out;
+  background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), rgba(242, 160, 7, .13), rgba(164, 22, 26, .05) 40%, transparent 70%);
+}
+.tb-spot::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  padding: 1px;
+  opacity: 0;
+  transition: opacity .3s ease-out;
+  background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 50%), rgba(242, 160, 7, .9), rgba(164, 22, 26, .5) 45%, transparent 75%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+.tb-spot:hover::before,
+.tb-spot:hover::after { opacity: 1; }
+.tb-trail-dot { transition: background-color .25s ease-out, border-color .25s ease-out, box-shadow .25s ease-out, transform .25s ease-out; }
+.group\/spot:hover .tb-trail-dot { background: #f2a007; border-color: #f2a007; box-shadow: 0 0 8px rgba(242, 160, 7, .8); transform: scale(1.15); }
+
+@keyframes tb-flicker {
+  0%, 100% { transform: scale(1, 1) skewX(0deg); }
+  25% { transform: scale(.97, 1.04) skewX(-1.5deg); }
+  50% { transform: scale(1.03, .97) skewX(1deg); }
+  75% { transform: scale(.98, 1.03) skewX(1.5deg); }
+}
+@keyframes tb-ember {
+  0% { transform: translate(0, 0) scale(1); opacity: 0; }
+  12% { opacity: 1; }
+  100% { transform: translate(var(--dx, 10px), -150px) scale(.2); opacity: 0; }
+}
+@keyframes tb-breathe {
+  0%, 100% { opacity: .75; transform: translate(-50%, -50%) scale(1); }
+  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+}
+@keyframes tb-cta {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(242, 160, 7, .55), 0 10px 30px rgba(242, 160, 7, .25); }
+  60% { box-shadow: 0 0 0 14px rgba(242, 160, 7, 0), 0 10px 30px rgba(242, 160, 7, .25); }
+}
+@keyframes tb-rise {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes tb-draw { to { transform: scaleX(1); } }
+.tb-flame { animation: tb-flicker 1.6s ease-in-out infinite; }
+.tb-flame-inner { animation: tb-flicker 1.1s ease-in-out infinite reverse; }
+.tb-ember { animation: tb-ember 3s ease-out infinite; opacity: 0; }
+.tb-ember:nth-child(odd) { --dx: -14px; }
+.tb-glow { animation: tb-breathe 3.2s ease-in-out infinite; }
+.tb-cta { animation: tb-cta 2.4s ease-out infinite; }
+.tb-rise { animation: tb-rise .6s cubic-bezier(.2, .7, .2, 1) both; }
+.tb-draw { transform: scaleX(0); transform-origin: left; animation: tb-draw 1.2s .4s cubic-bezier(.2, .7, .2, 1) forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .tb-flame, .tb-flame-inner, .tb-glow, .tb-cta, .tb-rise { animation: none; }
+  .tb-ember { display: none; }
+  .tb-draw { animation: none; transform: none; }
+}
+
+/* Process canvas: connection dots appear when hovering a box; arrows show moving dashes */
+/* In view mode the dots are never shown and can't be grabbed */
+.tb-canvas:not(.tb-editing) .react-flow__handle.tb-h { pointer-events: none; }
+.tb-canvas.tb-editing { box-shadow: inset 0 0 0 2px rgba(242, 160, 7, .55); }
+.tb-canvas .react-flow__handle.tb-h {
+  width: 11px;
+  height: 11px;
+  border: 2px solid #fff;
+  background: #a4161a;
+  opacity: 0;
+  transition: opacity .15s ease-out, transform .15s ease-out;
+}
+.tb-canvas .react-flow__handle.tb-h-data { background: #f2a007; }
+.tb-canvas .react-flow__handle.tb-h-note { background: #c9a227; }
+.tb-canvas.tb-editing .react-flow__node:hover .react-flow__handle.tb-h,
+.tb-canvas.tb-editing .react-flow__node.selected .react-flow__handle.tb-h,
+.tb-canvas.react-flow__container .connecting .react-flow__handle.tb-h { opacity: 1; }
+.tb-canvas .react-flow__handle.tb-h:hover { transform: translate(-50%, -50%) scale(1.35); }
+.tb-canvas .react-flow__handle-left.tb-h:hover,
+.tb-canvas .react-flow__handle-right.tb-h:hover { transform: translate(0, -50%) scale(1.35); }
+.tb-canvas .react-flow__handle-left.tb-h:hover { transform: translate(-50%, -50%) scale(1.35); }
+.tb-canvas .react-flow__handle-right.tb-h:hover { transform: translate(50%, -50%) scale(1.35); }
+.tb-canvas .react-flow__handle-bottom.tb-h:hover { transform: translate(-50%, 50%) scale(1.35); }
+.tb-canvas .react-flow__handle-top.tb-h:hover { transform: translate(-50%, -50%) scale(1.35); }
+@keyframes tb-dash { to { stroke-dashoffset: -24; } }
+.tb-canvas .tb-flow-edge { stroke-dasharray: 8 4; animation: tb-dash 1.2s linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .tb-canvas .tb-flow-edge { animation: none; stroke-dasharray: none; }
 }

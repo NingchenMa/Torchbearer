@@ -9,7 +9,9 @@ import { redact, redactDeep } from "@/lib/redact";
 import type { ObservedStep, ObserveQA } from "@/lib/types";
 
 // Fast models first: one call per changed screen must take a couple of seconds, not tens.
-const MODELS = ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-flash-lite-latest", "gemini-3.1-flash-lite"];
+// Measured 2026-11-10 on real screenshots: 3.1 Flash Lite with minimal thinking answers in about 1.5-4 s and
+// describes the action well; gemini-3.5-flash was out of quota (429) on every call.
+const MODELS = ["gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-flash-lite-latest", "gemini-3.5-flash"];
 
 const STEP_SHAPE = `{ "id": "w1", "title": string, "detail": string, "why": string | null, "rule": string | null, "time": "mm:ss" }`;
 
@@ -31,16 +33,19 @@ action: one sentence on what the expert did between PREVIOUS and CURRENT, with t
 
 workflow: the FULL workflow so far, in order. Keep every existing step, its id, why and rule. Add a step only for a new meaningful kind of action; when the expert repeats an earlier kind of action differently, add a step for the difference (e.g. "Attach the extra approval for this one"). Use NOW as time for new steps. Leave why and rule as they are; never invent them.
 
-question: this is what makes you an apprentice, not a recorder. Ask when a new hire watching could NOT work out something important from the screen alone. Pointed, specific to what just happened, one thing at a time. Aim for at least three good questions over a task (count ALREADY ASKED); once you have them, ask only when something is clearly worth it.
+question: this is what makes you an apprentice, not a recorder. Ask when a new hire watching could NOT work out something important from the screen alone. Pointed, specific to what just happened, one thing at a time. Ask whenever something important is unclear or you lack context to explain this step to a new hire; there is no fixed number, and a typical task needs a question every step or two.
 Worth asking (best first):
 - The decision: why they chose this option, value or document, and what would make them choose differently. If they handled a similar thing differently than before in the ACTION LOG (an extra or missing attachment, a different choice), ask what the difference is for.
 - The input: what information or document this step needs and where it comes from, e.g. "Where does that project number come from?" or "What do you check before entering that?"
 - What it feeds: how this step affects later steps or other people, e.g. "What happens with this approval later?" or "Who uses this field after you submit?"
 - A hidden rule or stop condition: a limit, threshold, exception or approval that decides it, or when they would stop and ask someone.
+- Missing context: what the task is for, what starts it, or a term, code or system name nobody has explained.
 - A gap in an earlier answer: an answer in ANSWERS SO FAR was vague ("it depends", "usually"). Ask what it depends on.
 Not worth asking: how the software works or how they moved around it (which menu, button, gallery or screen they used, whether a field fills itself in, whether they always use a feature: that's the tool, not their judgment), routine form-filling (amounts, names, dates), anything the screen already shows, anything already answered, anything you could guess from common sense. Never repeat an asked question or ask two things at once.
 At most 15 words, friendly, about what just happened, e.g. "You added a screenshot to this one but not the first. What's it for?"
 If you can't tell what the expert just did, don't guess: action null, question null.
+Stay on the TASK BEING TAUGHT. Screens that are not part of it are not steps: chat or social apps, personal browsing, email or documents unrelated to the task, the desktop, system settings, and Torchbearer's own pages (its vault, recorder, Teaching or Training tabs). For those: action null, no new step, no question. If the expert comes back to the task, carry on.
+Secrets: never write a password, login, access code or other credential into an action or a step. If the expert looks one up, write the step as "Look up the login for <system>" with no value, and never ask about its value.
 Screenshots can be several seconds apart, so steps may have happened in between that you did not see (for example a gallery or dialog that opened and closed). Never assume a step was skipped or done another way just because you didn't see it, and never ask about it.
 
 Never include personal data (emails, phone, card or bank numbers).`;
@@ -58,6 +63,7 @@ const toPart = (dataUrl: string) => ({
 
 interface Body {
   mode?: "observe" | "integrate";
+  task?: string; // the workflow name the expert gave
   frame?: string;
   previous?: string | null;
   workflow: ObservedStep[];
@@ -103,7 +109,7 @@ export async function POST(req: Request) {
   }
 
   const context = redact(
-    `NOW: ${now}\n\nACTION LOG:\n${(body.actions ?? []).map((a) => `${a.time} ${a.text}`).join("\n") || "(nothing yet)"}\n\nWORKFLOW SO FAR:\n${JSON.stringify(workflow)}\n\nALREADY ASKED (do not repeat):\n${asked.join("\n") || "(none)"}\n\nANSWERS SO FAR:\n${qa.map((x) => `Q: ${x.q}\nA: ${x.a}`).join("\n") || "(none)"}`,
+    `TASK BEING TAUGHT: ${body.task || "(not named)"}\nNOW: ${now}\n\nACTION LOG:\n${(body.actions ?? []).map((a) => `${a.time} ${a.text}`).join("\n") || "(nothing yet)"}\n\nWORKFLOW SO FAR:\n${JSON.stringify(workflow)}\n\nALREADY ASKED (do not repeat):\n${asked.join("\n") || "(none)"}\n\nANSWERS SO FAR:\n${qa.map((x) => `Q: ${x.q}\nA: ${x.a}`).join("\n") || "(none)"}`,
   );
   const parts = [
     { text: context },
@@ -111,7 +117,8 @@ export async function POST(req: Request) {
     { text: "CURRENT screenshot:" },
     toPart(body.frame ?? ""),
   ];
-  const r = await geminiJson<{ action?: string | null; workflow?: ObservedStep[]; question?: string | null }>(OBSERVE, parts, MODELS);
+  // A stalled model gets about 8 s before the next one is tried (the default share waited up to 15 s).
+  const r = await geminiJson<{ action?: string | null; workflow?: ObservedStep[]; question?: string | null }>(OBSERVE, parts, MODELS, undefined, 0.3);
   if (!r.ok) return NextResponse.json({ error: r.error }, { status: 502 });
 
   const out = redactDeep(r.data);
