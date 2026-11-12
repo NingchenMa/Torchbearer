@@ -17,19 +17,29 @@ const blocks = [...readFileSync("docs/agents.md", "utf8").matchAll(/```\n([\s\S]
 const [interviewerPrompt, tutorPrompt] = blocks;
 
 const skipTurn = { type: "system", name: "skip_turn", description: "Stay silent when the user is narrating or thinking aloud.", params: { system_tool_type: "skip_turn" } };
+// The Interviewer must not stay silent when something is unclear: that is when it should ask.
+const interviewerSkipTurn = {
+  ...skipTurn,
+  description: "Stay silent only when the expert is mid-sentence, or said something already clear and complete. Never use this when what they said is vague, unexplained or missing context: ask instead.",
+};
 
 const agents = [
   {
     envKey: "ELEVENLABS_INTERVIEWER_AGENT_ID",
     name: "Torchbearer - Interviewer",
     prompt: interviewerPrompt,
-    firstMessage: "Hi, I'm Torchbearer. Go ahead and show me how you do this task. I'll mostly listen, and ask when you pause.",
+    firstMessage: "Hi, I'm Torchbearer. Show me how you do this task and explain as you go. I'll ask whenever something isn't clear to me.",
+    skipTurn: interviewerSkipTurn,
+    // About 0.8 s to the first spoken word, short single questions (gemini-2.5-flash took 1.3-4.8 s). Measured 2026-11-10.
+    llm: "gpt-5.4-mini",
   },
   {
     envKey: "ELEVENLABS_TUTOR_AGENT_ID",
     name: "Torchbearer - Tutor",
     prompt: tutorPrompt,
     firstMessage: "Hi, I'm Torchbearer. I'll guide you through this the way your team's expert does it, and only speak up when you pause. Start whenever you're ready.",
+    // Fast (about 0.5-0.7 s) and asks instead of giving the answer away; GPT-5.4 mini told the new hire the rule outright.
+    llm: "claude-haiku-4-5",
   },
 ];
 
@@ -64,7 +74,7 @@ for (const a of agents) {
       agent: {
         first_message: a.firstMessage,
         language: "en",
-        prompt: { prompt: a.prompt, llm: "gemini-2.5-flash", temperature: 0.4, built_in_tools: { skip_turn: skipTurn } },
+        prompt: { prompt: a.prompt, llm: a.llm, temperature: 0.4, built_in_tools: { skip_turn: a.skipTurn ?? skipTurn } },
       },
     },
   };

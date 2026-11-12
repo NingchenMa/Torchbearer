@@ -3,7 +3,7 @@
 // every FRAME_MS we grab a frame and report whether it changed (cheap 32x18 thumbnail diff),
 // so only changed screens go to the LLM and "no change for a while" can mean "paused".
 
-const FRAME_MS = 1000; // one screenshot per second
+const FRAME_MS = 500; // two screenshots per second; only changed ones go to the LLM, one call at a time
 
 export interface Frame {
   dataUrl: string;
@@ -106,6 +106,7 @@ export function shareErrorText(e: unknown): string {
 /** A failed screen read, in words for the user. The next frame retries, so busy/slow only needs a calm note. */
 export function friendly(e: unknown): string {
   const m = e instanceof Error ? e.message : "";
+  if (/not signed in/i.test(m)) return "Your sign-in has ended. Open Torchbearer in a new tab and sign in again; this recording keeps going and picks up once you're back.";
   if (/took longer|high demand|overloaded|\b(429|500|503)\b/i.test(m)) return "The AI is slow right now. Still watching, trying again.";
   return "Couldn't read the screen. Trying again.";
 }

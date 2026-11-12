@@ -2,8 +2,8 @@
 // The screenshot-only Torchbearer loop:
 //   watch    every second a frame; changed frames go to /api/observe with the workflow so far
 //   write    the LLM returns what happened + the updated workflow (+ maybe a question)
-//   ask      a question is spoken only at a pause: screen still ≥ 3 s, nobody talking,
-//            ≥ 15 s since the last question
+//   ask      a question is spoken at the next short pause: screen still ≥ 2 s, nobody talking,
+//            and the last question already answered (or the expert has moved on)
 //   learn    the spoken answer is paired with its question and written into the workflow
 //            right away by a fast text-only call (why / rule on the right step)
 // Must be used inside <ConversationProvider>.
@@ -15,9 +15,8 @@ import { requestMic, useVoiceAgent } from "@/lib/useVoiceAgent";
 import type { ObservedStep, ObserveQA, TranscriptLine } from "@/lib/types";
 import { ScreenWatcher, friendly, shareErrorText, type Frame } from "./screenWatcher";
 
-const PAUSE_MS = 3000;
-const MIN_GAP_MS = 15000;
-const IDLE_MS = 12000; // screen still, nobody talking, nothing to ask: ask what happened
+const PAUSE_MS = 2000;
+const IDLE_MS = 8000; // how long screen and voice must both be still to count as "stopped"
 
 export type ObserverStatus = "idle" | "connecting" | "watching" | "reading" | "asking" | "off_record" | "debrief" | "building";
 
@@ -39,6 +38,26 @@ function pairAnswers(transcript: TranscriptLine[]): ObserveQA[] {
     }
   }
   return pairs;
+}
+
+/** Steps keyed by id, with "mm:ss" times compared as text (they are zero-padded). */
+const byTime = (a: ObservedStep, b: ObservedStep) => a.time.localeCompare(b.time);
+
+/**
+ * Combine a workflow the server just returned with the one on screen now. The screen-reading call
+ * and the answer-writing call can overlap, and each was sent an older copy, so neither result may
+ * simply replace the other: a why or rule already written is never wiped by an empty one, and a
+ * step that one call didn't know about yet is kept.
+ */
+function mergeWorkflow(current: ObservedStep[], incoming: ObservedStep[]): ObservedStep[] {
+  const now = new Map(current.map((s) => [s.id, s]));
+  const merged = incoming.map((s) => {
+    const was = now.get(s.id);
+    return was ? { ...s, why: s.why || was.why, rule: s.rule || was.rule } : s;
+  });
+  const seen = new Set(merged.map((s) => s.id));
+  const kept = current.filter((s) => !seen.has(s.id));
+  return kept.length ? [...merged, ...kept].sort(byTime) : merged;
 }
 
 export function useObserver(onWorkMapReady: (workflowId: string) => void) {
@@ -87,11 +106,17 @@ export function useObserver(onWorkMapReady: (workflowId: string) => void) {
       .then((data) => {
         if (!data.workflow) return;
         integrated.current = count;
-        setWorkflow(data.workflow);
+        setWorkflow((cur) => mergeWorkflow(cur, data.workflow));
       })
       .catch(() => {});
     return () => ctrl.abort();
   }, [qa]);
+
+  /** A new question is fine once the expert answered the last one (spoke after it) or went on working. */
+  function answeredOrMovedOn(lastSpeech: number) {
+    const asked = lastQuestionAt.current;
+    return !asked || lastSpeech > asked || watcher.current.lastChange > asked;
+  }
 
   async function onFrame(f: Frame) {
     const l = live.current;
@@ -120,7 +145,9 @@ export function useObserver(onWorkMapReady: (workflowId: string) => void) {
       for (const step of data.workflow as ObservedStep[]) {
         if (!stepShots.current[step.id]) stepShots.current[step.id] = watcher.current.grab(640) ?? "";
       }
-      setWorkflow(data.workflow);
+      // Recording may have stopped while this call ran: don't let a late screen change the workflow.
+      if (live.current.phase !== "task") return;
+      setWorkflow((cur) => mergeWorkflow(cur, data.workflow));
       setError(null);
       if (data.action) {
         actionsRef.current = [...actionsRef.current, { time: now, text: data.action }];
@@ -148,7 +175,7 @@ export function useObserver(onWorkMapReady: (workflowId: string) => void) {
       if (!q || l.offRecord || l.agent.isSpeaking) return;
       if (now - watcher.current.lastChange < PAUSE_MS) return; // still working on screen
       if (now - l.agent.lastUserSpeech.current < 2500) return; // still talking
-      if (now - lastQuestionAt.current < MIN_GAP_MS) return; // question budget
+      if (!answeredOrMovedOn(l.agent.lastUserSpeech.current)) return; // don't stack questions
       l.agent.sendUserMessage(`[ASK] ${q}`);
       asked.current.push(q);
       pending.current = null;
@@ -167,7 +194,7 @@ export function useObserver(onWorkMapReady: (workflowId: string) => void) {
       if (pending.current || l.offRecord || l.agent.isSpeaking) return;
       if (idleAsked.current > Math.max(watcher.current.lastChange, l.agent.lastUserSpeech.current)) return; // already asked during this stop
       const quietSince = Math.max(watcher.current.lastChange, l.agent.lastUserSpeech.current, lastQuestionAt.current);
-      if (now - quietSince < IDLE_MS || now - lastQuestionAt.current < MIN_GAP_MS) return;
+      if (now - quietSince < IDLE_MS || !answeredOrMovedOn(l.agent.lastUserSpeech.current)) return;
       const last = actionsRef.current[actionsRef.current.length - 1];
       l.agent.sendUserMessage(
         `[IDLE] The expert has stopped and gone quiet for ${Math.round((now - quietSince) / 1000)} seconds${last ? `, right after: ${last.text}` : ""}. Ask one short question about what happened or why they stopped.`,
@@ -214,7 +241,7 @@ export function useObserver(onWorkMapReady: (workflowId: string) => void) {
   function toggleOffRecord() {
     const next = !offRecord;
     setOffRecord(next);
-    watcher.current.paused = next;
+    watcher.current.paused = next || phase !== "task"; // back on the record during the debrief still sends no screens
     agent.setMuted(next);
     if (next) offRanges.current.push({ from: elapsed(), to: "" });
     else if (offRanges.current.length) offRanges.current[offRanges.current.length - 1].to = elapsed();
@@ -223,6 +250,7 @@ export function useObserver(onWorkMapReady: (workflowId: string) => void) {
 
   function endTask() {
     setPhase("debrief");
+    live.current.phase = "debrief"; // takes effect for a frame already on its way, before the next render
     watcher.current.paused = true; // stop reading the screen; sharing stays on until Send to Mapping
     pending.current = null;
     if (!agent.connected) return; // no voice (e.g. out of credits): go straight to building the map

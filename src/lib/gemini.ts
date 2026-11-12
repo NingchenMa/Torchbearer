@@ -2,7 +2,9 @@
 
 type Part = { text: string } | { inlineData: { mimeType: string; data: string } };
 
-export const TEXT_MODELS = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-3.5-flash", "gemini-3.1-flash-lite"];
+// Fast models first: gemini-3.8-flash and gemini-flash-latest ran past 60 s in tests on 2026-11-10.
+export const TEXT_MODELS = ["gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.8-flash"];
+const MINIMAL_THINKING = new Set(["gemini-3.1-flash-lite", "gemini-3.5-flash-lite"]);
 export const VISION_MODELS = ["gemini-3.1-flash-lite", "gemini-flash-lite-latest", "gemini-3.8-flash"];
 
 export async function geminiJson<T>(
@@ -35,7 +37,12 @@ export async function geminiJson<T>(
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: system }] },
           contents: [{ role: "user", parts }],
-          generationConfig: { responseMimeType: "application/json", temperature: 0.2 },
+          generationConfig: {
+            responseMimeType: "application/json",
+            temperature: 0.2,
+            // Flash Lite answers about twice as fast with minimal thinking, with the same quality on screen reading.
+            ...(MINIMAL_THINKING.has(model) ? { thinkingConfig: { thinkingLevel: "minimal" } } : {}),
+          },
         }),
         signal: AbortSignal.timeout(wait),
       });

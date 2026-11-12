@@ -1,9 +1,9 @@
 // GET /api/auth/callback?code&state — Cognito sends the browser back here after sign-in.
 // Swaps the one-time code for tokens (server to server, with the client secret), verifies the ID token,
-// and stores it in an httpOnly session cookie.
+// and stores it (plus the refresh token that renews it) in httpOnly cookies.
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { appOrigin, cognito, loginCookie, SESSION_COOKIE, userFromToken } from "@/lib/auth";
+import { appOrigin, cognito, loginCookie, REFRESH_COOKIE, SESSION_COOKIE, sessionCookieOptions, userFromToken } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -36,18 +36,15 @@ export async function GET(req: Request) {
     cache: "no-store",
   });
   if (!tokenRes.ok) return fail("Sign-in failed. Please try again.");
-  const { id_token } = (await tokenRes.json()) as { id_token?: string };
+  const { id_token, refresh_token } = (await tokenRes.json()) as { id_token?: string; refresh_token?: string };
   const user = await userFromToken(id_token);
   if (!user) return fail("Sign-in failed. Please try again.");
 
   const res = NextResponse.redirect(`${origin}${login.next}`);
-  res.cookies.set(SESSION_COOKIE, id_token!, {
-    httpOnly: true,
-    secure: origin.startsWith("https://"),
-    sameSite: "lax",
-    path: "/",
-    maxAge: 12 * 60 * 60,
-  });
+  const secure = origin.startsWith("https://");
+  res.cookies.set(SESSION_COOKIE, id_token!, sessionCookieOptions(secure));
+  // The sign-in still ends after 12 hours: the refresh cookie expires then, even if Cognito would allow longer.
+  if (refresh_token) res.cookies.set(REFRESH_COOKIE, refresh_token, sessionCookieOptions(secure));
   res.cookies.set(loginCookie(state), "", { path: "/api/auth", maxAge: 0 });
   return res;
 }

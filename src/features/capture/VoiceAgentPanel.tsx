@@ -292,7 +292,7 @@ function Interviewer({ stage, setStage }: Props) {
         tasks={["Meal expense report", "Client-travel expense report"]}
         expectations={[
           "Watches <b>this Ledgerline window only</b>, nothing else on your screen.",
-          "Stays quiet while you work and asks a few short questions out loud when you pause.",
+          "Listens while you work and asks short questions out loud whenever something isn't clear.",
           "You can go <b>off the record</b> any time.",
           "Names and card numbers are hidden automatically.",
           "You review everything it learned before anyone else sees it.",
@@ -449,7 +449,7 @@ function Interviewer({ stage, setStage }: Props) {
       status={statusLabel}
       listening={ui === "listening"}
       question={lastAgent ? { time: lastAgent.time, text: lastAgent.text } : undefined}
-      idleText={ui === "connecting" ? "Connecting…" : "Work as usual. I'll stay quiet and only ask when you pause."}
+      idleText={ui === "connecting" ? "Connecting…" : "Work as usual and explain as you go. I'll ask whenever something isn't clear."}
       autoFold={autoFold}
       // Also offered without a live agent (e.g. voice credits ran out): events alone still build a map.
       showBuild={!agent.connected && seenEvents.length > 0 && !starting}

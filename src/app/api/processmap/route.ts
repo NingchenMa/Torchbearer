@@ -13,7 +13,9 @@ export const dynamic = "force-dynamic";
 
 // Full models first: the light ones tend to link every step to the one before. A light one is
 // still the last resort, since Gemini is often overloaded and a rough map beats none.
-const MODELS = ["gemini-3.5-flash", "gemini-3.8-flash", "gemini-flash-latest", "gemini-3.5-flash-lite"];
+// Measured 2026-11-10 on a recorded 11-step workflow: both Flash Lite models finish in about 3-4 s and name more
+// input sources; gemini-3.8-flash, gemini-flash-latest and gemini-3.7-flash ran past 60 s, gemini-3.5/3.6-flash were out of quota.
+const MODELS = ["gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.8-flash"];
 const MAX_SHOTS = 6; // more images made Gemini too slow for the hosting time limit (~30 s)
 
 const PROCESS = `You turn a recorded work process into a process map that a new hire and a manager can read.

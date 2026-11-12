@@ -35,8 +35,12 @@ function Teach() {
   const idParam = useSyncExternalStore(() => () => {}, readId, () => null);
   // From the database: every trained workflow, plus the prepared example.
   const [workflows, setWorkflows] = useState<WorkflowSummary[]>([exampleSummary()]);
+  const [listLoaded, setListLoaded] = useState(false);
   useEffect(() => {
-    listWorkflows().then((list) => setWorkflows([...list, exampleSummary()]));
+    listWorkflows().then((list) => {
+      setWorkflows([...list, exampleSummary()]);
+      setListLoaded(true);
+    });
   }, []);
   const [picked, setPickedState] = useState<string | null | undefined>(undefined); // undefined = use ?id
   const selectedId = picked === undefined ? idParam : picked;
@@ -83,7 +87,7 @@ function Teach() {
   );
 
   // Training always starts from an approved workflow: without one, show the list to pick from.
-  if (!selectedId) return <WorkflowPicker workflows={workflows} onPick={setPicked} />;
+  if (!selectedId) return <WorkflowPicker workflows={workflows} loaded={listLoaded} onPick={setPicked} />;
 
   return (
     <>
@@ -116,14 +120,16 @@ function Teach() {
 }
 
 /** The Training tab's first screen: approved workflows only, newest first. */
-function WorkflowPicker({ workflows, onPick }: { workflows: WorkflowSummary[]; onPick: (id: string) => void }) {
+function WorkflowPicker({ workflows, loaded, onPick }: { workflows: WorkflowSummary[]; loaded: boolean; onPick: (id: string) => void }) {
   const approved = workflows.filter((w) => w.published && w.id !== EXAMPLE_ID).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
   return (
     <div className="min-h-full bg-[linear-gradient(180deg,#f3f2ff_0%,#ffffff_45%)]">
       <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
         <h1 className="text-[30px] font-light tracking-tight text-[#1f2d3d]">Training</h1>
         <p className="mt-1 text-[15px] text-[#475467]">Pick an approved workflow to train a new hire on. TorchBearer coaches them the way your expert does it.</p>
-        {approved.length === 0 ? (
+        {!loaded ? (
+          <p className="mt-8 text-[15px] text-[#667085]">Loading your workflows…</p>
+        ) : approved.length === 0 ? (
           <div className="mt-8 rounded-md border border-dashed border-[#c9c6f5] bg-white p-8 text-center">
             <h2 className="text-[18px] font-medium text-[#1f2d3d]">No approved workflows yet</h2>
             <p className="mx-auto mt-2 max-w-md text-[15px] text-[#475467]">An expert records a workflow in Teaching, then someone approves it in Workflows. It shows up here once it&apos;s approved.</p>

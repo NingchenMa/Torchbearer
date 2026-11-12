@@ -54,7 +54,7 @@ export default function ReviewPage() {
             {current?.learner ?? "New hire"}&apos;s practice: <span className="font-medium text-indigo">what might differ from the approved way</span>
           </h1>
           <p className="mt-2 max-w-2xl text-[16.5px] text-[#475467]">
-            Torchbearer never tells a new hire they were wrong. It sends anything that might differ from the expert&apos;s approved way here,
+            When a new hire goes against one of the expert&apos;s own reasons or rules, Torchbearer tells them kindly and sends it here,
             for you to decide.
           </p>
         </div>
@@ -63,7 +63,7 @@ export default function ReviewPage() {
       <div className="mx-auto max-w-6xl px-6 py-6">
         {items.length === 0 && (
           <div className="rounded-md border border-line bg-white p-8 text-center text-[15px] text-[#475467]">
-            Nothing under review yet. Items appear here when the new hire practises in <Link href="/teach" className="text-brand hover:underline">Teaching</Link>.
+            Nothing under review yet. Items appear here when the new hire practises in <Link href="/teach" className="text-brand hover:underline">Training</Link>.
           </div>
         )}
         <ol className="flex flex-col gap-4">
