@@ -8,6 +8,7 @@ import { orgDb, safe } from "@/lib/db";
 import { geminiJson } from "@/lib/gemini";
 import { redact, redactDeep } from "@/lib/redact";
 import type { StepProcess, WorkflowRecord } from "@/lib/types";
+import { ACTION_NAMES } from "@/features/workmap/actionCategory";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,7 @@ You get the expert's STEPS in order (title, what was seen on screen, the expert'
 
 For EVERY step return:
 - tool: the app, system, site or document the step happens in, as specific as the screen shows (e.g. "Ledgerline · expense form", "Outlook", "Supplier portal"). Use the same name for the same tool across steps.
+- action: what kind of action the step is, exactly one of: "Find and open" (navigate, search, open or start something), "Enter data" (type or fill in information), "Check and decide" (review, verify, compare, approve or choose), "Attach files" (upload or attach a document), "Submit and send" (submit, save, send or share the result). Use "Other" only if none fits.
 - inputs: the data or documents the step needs, each with where it comes from: an earlier step by its number ("step 2"), never its [id], a person or team ("from the supervisor"), a system ("from the travel booking"), or "unknown". Only real information or documents (e.g. "receipt", "project number", "supervisor approval"), not every field on screen, and NEVER the fact that an earlier step was done ("form opened", "details filled" are not inputs). Name documents by their kind only ("receipt", "approval email"), never with a shop, restaurant, platform, person or file name ("receipt", not "Bitebox receipt").
 - outputs: what the step produces or changes (a saved form, an attached document, an approval, a status).
 - feedsInto: ids of LATER steps that use this step's outputs. [] if none.
@@ -31,7 +33,7 @@ For EVERY step return:
 
 Expert answers: when a step lists "expert answered", use those answers (for example as an input's source or the decision's reason) and never ask that question again.
 Rules: a step only "feedsInto" a later step when that later step actually uses something it produced. Stay generic about the case (no people's names, no amounts or ids unless they are a rule). Never invent tools, people or systems you can't see or read. Keep every string short.
-Return JSON only: {"steps":[{"id": string, "tool": string, "inputs":[{"name": string, "source": string}], "outputs":[string], "feedsInto":[string], "decision": string, "unknown":[string]}]}`;
+Return JSON only: {"steps":[{"id": string, "tool": string, "action": string, "inputs":[{"name": string, "source": string}], "outputs":[string], "feedsInto":[string], "decision": string, "unknown":[string]}]}`;
 
 const toPart = (dataUrl: string) => ({ inlineData: { mimeType: "image/jpeg", data: dataUrl.replace(/^data:image\/\w+;base64,/, "") } });
 
@@ -97,6 +99,7 @@ export async function POST(req: Request) {
           ...s,
           process: {
             tool: str(p.tool) || "unknown",
+            ...(ACTION_NAMES.includes(str(p.action)) ? { action: str(p.action) } : {}),
             inputs,
             outputs: strs(p.outputs),
             feedsInto: strs(p.feedsInto).filter((x) => ids.has(x) && later.has(x)),

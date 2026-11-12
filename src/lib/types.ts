@@ -95,6 +95,7 @@ export interface StepAnswer {
 /** Process map: how one step fits the whole process (tools, data in and out, links to other steps). */
 export interface StepProcess {
   tool: string; // the app, system or site used, e.g. "Ledgerline · expense form"
+  action?: string; // kind of action: one of ACTION_NAMES in features/workmap/actionCategory.ts
   inputs: { name: string; source: string }[]; // data or documents the step needs, and where each comes from
   outputs: string[]; // what the step produces or changes
   feedsInto: string[]; // ids of later steps that use this step's outputs
@@ -169,6 +170,7 @@ export interface WorkMap {
   offRecord?: { from: string; to: string }[]; // "mm:ss" ranges the expert took off the record (shown as gaps)
   published?: boolean; // expert approved the map; Teaching mode uses only published maps
   processBuiltAt?: string; // ISO time the process map was last built
+  layoutByAction?: Record<string, { x: number; y: number }>; // the same, for the canvas grouped by action
   layout?: Record<string, { x: number; y: number }>; // process map boxes the user moved on the canvas (node id → position)
   flow?: { source: string; target: string }[]; // process map arrows as the user edited them (node ids; "start", "end", step ids, "rule-<step id>")
   notes?: CanvasNote[]; // sticky notes on the process map canvas

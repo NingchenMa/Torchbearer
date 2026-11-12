@@ -11,6 +11,8 @@ import Link from "next/link";
 import { EXAMPLE_ID, getWorkflow, listWorkflows, saveWorkflow } from "@/lib/session";
 import type { StepAnswer, WorkflowRecord, WorkflowSummary, WorkMap, WorkMapStep } from "@/lib/types";
 import { ProcessCanvas } from "@/features/workmap/ProcessCanvas";
+import { ACTION_NAMES, OTHER_ACTION, actionColor, actionOf } from "@/features/workmap/actionCategory";
+import { Segmented } from "@/features/ui/fx";
 
 const readId = () => {
   try {
@@ -68,6 +70,7 @@ export default function ProcessMapPage() {
   const [building, setBuilding] = useState(false);
   const [zoom, setZoom] = useState<{ src: string; title: string } | null>(null);
   const [me, setMe] = useState<string | undefined>(undefined);
+  const [groupBy, setGroupBy] = useState<"tool" | "action">("tool");
   useEffect(() => {
     fetch("/api/auth/me")
       .then((r) => (r.ok ? r.json() : null))
@@ -161,6 +164,15 @@ export default function ProcessMapPage() {
   const total = timed.reduce((a, t) => a + (t.duration ?? 0), 0);
   const tools = [...new Set(steps.map((s) => s.process?.tool).filter((t): t is string => !!t))];
   const color = (tool?: string) => TOOL_COLORS[Math.max(0, tools.indexOf(tool ?? "")) % TOOL_COLORS.length];
+  // Grouped by action: one lane per kind of action, in the usual order of a task, Other last.
+  const byAction = groupBy === "action";
+  const actionLanes = [...ACTION_NAMES, OTHER_ACTION.name];
+  // Moving boxes while grouped by action keeps its own positions, so the tool view stays as it was.
+  const saveActionCanvas = (patch: Partial<WorkMap>) => {
+    if (!("layout" in patch)) return saveCanvas(patch);
+    const { layout, ...rest } = patch;
+    saveCanvas({ ...rest, layoutByAction: layout });
+  };
   const decisions = steps.filter((s) => s.process?.decision || s.guardrails.length).length;
   const questions = steps.reduce((a, s) => a + openQuestions(s).length, 0);
   const order = new Map(steps.map((s, i) => [s.id, i + 1]));
@@ -226,16 +238,31 @@ export default function ProcessMapPage() {
         )}
 
         {/* The whole process as a diagram: lanes per tool, rules as diamonds, durations on the arrows */}
-        <h2 className="mb-3 text-[13px] font-bold uppercase tracking-[.12em] text-[#667085]">Process diagram</h2>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-[13px] font-bold uppercase tracking-[.12em] text-[#667085]">Process diagram</h2>
+          <div className="flex items-center gap-2 text-[13.5px] text-muted">
+            <span>Group steps by</span>
+            <Segmented
+              label="Group steps by"
+              value={groupBy}
+              onChange={setGroupBy}
+              options={[
+                { value: "tool", label: "Tool" },
+                { value: "action", label: "Action" },
+              ]}
+            />
+          </div>
+        </div>
         <ProcessCanvas
+          key={groupBy}
           timed={timed}
-          map={record.map}
-          onSave={record.id === EXAMPLE_ID ? undefined : saveCanvas}
+          map={byAction ? { ...record.map, layout: record.map.layoutByAction } : record.map}
+          onSave={record.id === EXAMPLE_ID ? undefined : byAction ? saveActionCanvas : saveCanvas}
           me={me}
           tools={built ? tools : []}
-          lanes={built && tools.length ? tools : ["All steps"]}
-          laneOf={(s) => (built && tools.length ? Math.max(0, tools.indexOf(s.process?.tool ?? "")) : 0)}
-          color={(lane) => (built ? color(lane) : "#a4161a")}
+          lanes={byAction ? actionLanes : built && tools.length ? tools : ["All steps"]}
+          laneOf={(s) => (byAction ? actionLanes.indexOf(actionOf(s)) : built && tools.length ? Math.max(0, tools.indexOf(s.process?.tool ?? "")) : 0)}
+          color={(lane) => (byAction ? actionColor(lane) : built ? color(lane) : "#a4161a")}
           fmt={fmt}
         />
       </div>
@@ -275,11 +302,10 @@ export default function ProcessMapPage() {
                       <span className="rounded-full bg-[#f2f4f7] px-2.5 py-0.5 font-mono text-[12px] text-[#475467]">{s.time} · {fmt(duration)}</span>
                     )}
                   </div>
-                  {p && (
-                    <div className="mt-1.5">
-                      <span className="inline-block rounded-sm px-2 py-0.5 text-[12px] font-medium text-white" style={{ background: color(p.tool) }}>{p.tool}</span>
-                    </div>
-                  )}
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {p && <span className="inline-block rounded-sm px-2 py-0.5 text-[12px] font-medium text-white" style={{ background: color(p.tool) }}>{p.tool}</span>}
+                    <span className="inline-block rounded-sm border px-2 py-0.5 text-[12px] font-medium" style={{ color: actionColor(actionOf(s)), borderColor: actionColor(actionOf(s)) }}>{actionOf(s)}</span>
+                  </div>
                   {(s.correction || s.decision) && (
                     <p className="mt-3 text-[15px] leading-relaxed text-[#344054]">
                       <b className="text-[#1f2d3d]">What the expert did:</b> {s.correction || s.decision}
