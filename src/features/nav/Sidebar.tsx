@@ -2,7 +2,7 @@
 // The app's navigation, on the left of every page (a narrow icon rail on phones).
 //   Workflows   the vault, plus a workflow's Work Map and Process map
 //   Reviews     practice sessions to decide on, with a count of what is waiting
-//   Assign      give a workflow to a new hire (managers and admins; others are told they lack access)
+//   Assign      give a workflow to a new hire (managers and admins only)
 //   Training    the work assigned to you
 //   Access management   admins only: change people's access and add members
 // At the bottom: the company, who is signed in, their role, and Sign out.
@@ -11,7 +11,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { BotFace } from "@/features/observe/Launcher";
-import { ROLE_LABEL } from "@/lib/roles";
+import { ROLE_LABEL, canAssign } from "@/lib/roles";
 import { useMe } from "@/lib/useMe";
 
 const Icon = ({ children }: { children: React.ReactNode }) => (
@@ -53,6 +53,8 @@ export default function Sidebar() {
   }, [path, hidden]);
 
   if (hidden) return null;
+  // A page the person can't use gets no entry in their sidebar. (Opening its address still says they lack access.)
+  const items = ITEMS.filter((t) => t.href !== "/assign" || (!!me && canAssign(me)));
   const active = (match: string[]) => match.some((m) => path === m || path.startsWith(m + "/"));
   const link = (t: { href: string; label: string; match: string[]; icon: React.ReactNode; badge?: boolean }) => {
     const on = active(t.match);
@@ -85,7 +87,7 @@ export default function Sidebar() {
       </Link>
 
       <div className="mx-2 mb-2 mt-1 hidden text-[11.5px] font-bold uppercase tracking-[.12em] text-[#667085] md:block">Workflows</div>
-      <nav className="flex flex-col gap-1" aria-label="Workflows">{ITEMS.map(link)}</nav>
+      <nav className="flex flex-col gap-1" aria-label="Workflows">{items.map(link)}</nav>
 
       <div className="mx-2 mb-2 mt-6 hidden text-[11.5px] font-bold uppercase tracking-[.12em] text-[#667085] md:block">Modules</div>
       <nav className="mt-4 flex flex-col gap-1 md:mt-0" aria-label="Modules">
