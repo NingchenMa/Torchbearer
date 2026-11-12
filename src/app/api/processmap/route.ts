@@ -4,10 +4,11 @@
 // Step times come from the recording itself (computed on the page), not from the model.
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
-import { orgDb, safe } from "@/lib/db";
+import { orgDb } from "@/lib/db";
 import { geminiJson } from "@/lib/gemini";
 import { redact, redactDeep } from "@/lib/redact";
 import type { StepProcess, WorkflowRecord } from "@/lib/types";
+import { openWorkflow, workflowPath } from "@/lib/workflows";
 
 export const dynamic = "force-dynamic";
 
@@ -40,9 +41,9 @@ export async function POST(req: Request) {
   const { id } = (await req.json()) as { id?: string };
   if (!id) return NextResponse.json({ error: "Missing workflow id" }, { status: 400 });
   const db = orgDb(u.org);
-  const key = `workflows/${safe(id)}.json`;
-  const record = await db.readJson<WorkflowRecord>(key);
-  if (!record) return NextResponse.json({ error: "Workflow not found" }, { status: 404 });
+  const key = workflowPath(id);
+  const record = await openWorkflow(u, id); // 403 unless a manager, an admin, or the recorder
+  if (record instanceof NextResponse) return record;
   const steps = record.map.steps;
   if (!steps.length) return NextResponse.json({ error: "This workflow has no steps yet" }, { status: 400 });
 

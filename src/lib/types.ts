@@ -116,6 +116,8 @@ export interface WorkflowRecord {
   name: string;
   createdAt: string;
   map: WorkMap;
+  /** Cognito user ID of whoever recorded it. Set by the server on first save, never by the browser. */
+  ownerId?: string;
 }
 
 /** What the workflow list shows (the full record is loaded on demand). */
@@ -125,8 +127,10 @@ export interface WorkflowSummary {
   createdAt: string;
   published: boolean;
   stepCount: number;
-  /** Who recorded it (the signed-in expert's name), when known. */
+  /** Who recorded it (the signed-in expert's name), for display. */
   trainedBy?: string;
+  /** Cognito user ID of the recorder; access is decided by this, not the name. Missing on workflows saved before owners existed. */
+  ownerId?: string;
 }
 
 /** Someone in the company: kept so managers can pick people to assign work to. */
