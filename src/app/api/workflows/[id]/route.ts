@@ -6,6 +6,7 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { orgDb } from "@/lib/db";
+import { ASSIGNMENTS, readAssignments } from "@/lib/assignments";
 import { canDeleteWorkflow, canManageWorkflow } from "@/lib/roles";
 import type { WorkflowRecord, WorkflowSummary } from "@/lib/types";
 import { WORKFLOW_INDEX, openWorkflow, summaryOf, workflowPath } from "@/lib/workflows";
@@ -56,5 +57,8 @@ export async function DELETE(_req: Request, { params }: Ctx) {
   await db.remove(workflowPath(id));
   const index = (await db.readJson<WorkflowSummary[]>(WORKFLOW_INDEX)) ?? [];
   await db.writeJson(WORKFLOW_INDEX, index.filter((w) => w.id !== id));
+  // Nobody is left training on a workflow that no longer exists.
+  const assignments = await readAssignments(u.org);
+  if (assignments.some((a) => a.workflowId === id)) await db.writeJson(ASSIGNMENTS, assignments.filter((a) => a.workflowId !== id));
   return NextResponse.json({ ok: true });
 }
