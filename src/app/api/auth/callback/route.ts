@@ -4,6 +4,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { appOrigin, cognito, loginCookie, REFRESH_COOKIE, SESSION_COOKIE, sessionCookieOptions, userFromToken } from "@/lib/auth";
+import { upsertMember } from "@/lib/members";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +40,12 @@ export async function GET(req: Request) {
   const { id_token, refresh_token } = (await tokenRes.json()) as { id_token?: string; refresh_token?: string };
   const user = await userFromToken(id_token);
   if (!user) return fail("Sign-in failed. Please try again.");
+
+  // Record the person in the company directory (name, email, role) so managers can assign work to them.
+  // Signing in must never fail because of this.
+  try {
+    await upsertMember(user);
+  } catch {}
 
   const res = NextResponse.redirect(`${origin}${login.next}`);
   const secure = origin.startsWith("https://");

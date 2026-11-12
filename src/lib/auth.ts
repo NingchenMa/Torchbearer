@@ -5,9 +5,11 @@
 // and returns the user's company ("org"). All data is stored under that company's prefix.
 // Invited users carry a company ID (custom:org, which users can't change). People who sign up on their own
 // get a private workspace keyed to their Cognito user ID, so they never see another company's data.
+// A user's role comes from their Cognito group in the same token ("admin" or "manager"); no group means employee.
 import { CognitoJwtVerifier } from "aws-jwt-verify";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import type { Role } from "./roles";
 
 export const SESSION_COOKIE = "tb_session";
 export const REFRESH_COOKIE = "tb_refresh";
@@ -23,10 +25,21 @@ export const cognito = {
   domain: process.env.COGNITO_DOMAIN ?? "", // e.g. https://torchbearer.auth.us-east-1.amazoncognito.com
 };
 
+export type { Role } from "./roles";
+
 export interface User {
+  /** Stable Cognito user ID (the token's sub). Owners and assignments are recorded by this, never by name. */
+  id: string;
   email: string;
   name: string;
   org: string;
+  role: Role;
+}
+
+/** Highest role among the user's Cognito groups. */
+function roleFromGroups(groups: unknown): Role {
+  const g = Array.isArray(groups) ? groups : [];
+  return g.includes("admin") ? "admin" : g.includes("manager") ? "manager" : "employee";
 }
 
 let verifier: ReturnType<typeof CognitoJwtVerifier.create<{ userPoolId: string; tokenUse: "id"; clientId: string }>> | null = null;
@@ -44,7 +57,7 @@ export async function userFromToken(token: string | undefined): Promise<User | n
     const org = typeof p["custom:org"] === "string" && p["custom:org"] ? p["custom:org"] : `${PERSONAL_ORG_PREFIX}${p.sub}`;
     const email = typeof p.email === "string" ? p.email : "";
     const name = typeof p.name === "string" && p.name ? p.name : email.split("@")[0];
-    return { email, name, org };
+    return { id: p.sub, email, name, org, role: roleFromGroups(p["cognito:groups"]) };
   } catch {
     return null;
   }
