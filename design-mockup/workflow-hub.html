@@ -335,6 +335,21 @@
   .ws .role { display: inline-block; margin: 4px 0 0; border-radius: 999px; padding: 0 8px; font-size: 12px; font-weight: 500; background: var(--indigo-soft); color: var(--indigo); }
   .ws .sk { display: block; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #c9ccd1; font-size: 11.5px; color: var(--muted); }
   .ws .sk select { width: 100%; height: 34px; margin-top: 4px; font-size: 13px; padding: 0 6px; }
+
+  /* ---------- access management (admin only) ---------- */
+  .req { color: var(--err); }
+  .field input[type=text], .field input[type=email] { width: 100%; height: 40px; padding: 0 12px; border: 1px solid #9aa0a6; border-radius: var(--sm); background: #fff; }
+  .field input[type=text]:focus, .field input[type=email]:focus { border-color: var(--indigo); outline: none; }
+  .field input[type=text].bad, .field input[type=email].bad { border-color: var(--err); }
+  .ferr { margin: 6px 0 0; font-size: 13px; color: var(--err); }
+  .info { border-radius: var(--md); background: var(--panel2); padding: 10px 12px; font-size: 13.5px; color: var(--muted); }
+  .flash { margin-bottom: 16px; border: 1px solid var(--ok-line); border-radius: var(--md); background: var(--ok-soft); color: var(--ok); padding: 12px 16px; font-size: 14.5px; }
+  .flash.bad { border-color: #f3c2c2; background: var(--err-soft); color: #8e1b1b; }
+  .person-cell { display: flex; align-items: center; gap: 10px; }
+  .person-cell .av2 { width: 32px; height: 32px; border-radius: 50%; background: var(--indigo-soft); color: var(--indigo); display: grid; place-items: center; font-size: 11.5px; font-weight: 500; flex: none; }
+  .you { margin-left: 8px; border-radius: 999px; background: #eef0f3; color: #475467; padding: 0 8px; font-size: 12px; }
+  .mono { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; color: #475467; }
+  .roleSel { height: 36px; padding: 0 8px; font-size: 14px; } .roleSel:disabled { background: var(--panel); color: var(--faint); }
 </style>
 </head>
 <body data-page="workflows">
@@ -347,9 +362,10 @@
     <a href="#reviews" data-nav="reviews"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg><span>Reviews</span><b class="count" id="navCount">7</b></a>
     <a href="#assign" data-nav="assign"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Assign</span></a>
   </nav>
-  <div class="nav-label" style="margin-top:22px">Module</div>
+  <div class="nav-label" style="margin-top:22px">Modules</div>
   <nav class="nav" aria-label="Modules">
     <a href="#training" data-nav="training"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6l8-3 8 3-8 3-8-3z"/><path d="M7 10.5V15c0 1.5 2.5 3 5 3s5-1.5 5-3v-4.5"/></svg><span>Training</span></a>
+    <a href="#access" data-nav="access" id="navAccess" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/></svg><span>Access management</span></a>
   </nav>
   <div class="ws"><b id="meName"></b><div class="em" id="meEmail"></div><span class="role" id="meRole"></span><br><a href="#" data-toast="Signs out">Sign out</a>
     <label class="sk">Viewing as (sketch only)<select id="meSel"></select></label></div>
@@ -455,6 +471,39 @@
       <ol class="steps" id="pmSteps"></ol>
       <h2 class="h2">Data flow</h2>
       <div class="pd"><div class="tablewrap"><table><thead><tr><th>Data or document</th><th>Comes from</th><th>Used in</th></tr></thead><tbody id="pmData"></tbody></table></div></div>
+    </div>
+  </section>
+
+  <!-- ================= access management (admin only) ================= -->
+  <section class="view" id="view-access">
+    <div class="wrap"><div class="head"><h1>Access management</h1></div></div>
+    <div class="wrap" id="acDenied" style="display:none"><div class="deny"><div class="lock"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg></div><p>You lack access to manage access.</p><a class="btn" href="#workflows">← Back to Workflows</a></div></div>
+    <div class="wrap content" id="acContent">
+      <section class="stats three" aria-label="Summary">
+        <div class="stat"><span>Admins</span><b id="acAdmin">0</b></div>
+        <div class="stat"><span>Managers</span><b id="acMgr">0</b></div>
+        <div class="stat"><span>Employees</span><b id="acEmp">0</b></div>
+      </section>
+      <div class="flash" id="acFlash" role="status" style="display:none"></div>
+      <div class="assign-grid">
+        <form class="panel" id="acForm" novalidate>
+          <h2>Add a member</h2>
+          <div class="in">
+            <div class="field"><label class="lab" for="acName">Full name <span class="req">*</span></label><input type="text" id="acName" autocomplete="off" placeholder="e.g. Alex Kim"><p class="ferr" data-err="name" hidden>Enter the person&rsquo;s full name.</p></div>
+            <div class="field"><label class="lab" for="acEmail">Work email <span class="req">*</span></label><input type="email" id="acEmail" autocomplete="off" placeholder="name@company.com"><p class="ferr" data-err="email" hidden>Enter a valid work email.</p></div>
+            <div class="field"><label class="lab" for="acEmpId">Employee ID <span class="req">*</span></label><input type="text" id="acEmpId" autocomplete="off" placeholder="e.g. E-1042"><p class="ferr" data-err="empId" hidden>Enter an employee ID (letters, numbers, . - _).</p></div>
+            <div class="field"><label class="lab" for="acRole">Access level <span class="req">*</span></label><select id="acRole"><option value="employee">Employee</option><option value="manager">Manager</option><option value="admin">Admin</option></select><p class="hint" id="acRoleHint"></p></div>
+            <p class="info">They get an email with a temporary password and choose their own when they first sign in.</p>
+            <button class="btn pri" type="submit">Add member</button>
+          </div>
+        </form>
+        <div class="panel">
+          <h2>People <span class="meta" id="acCount"></span></h2>
+          <div class="tfilters"><input class="search" id="acQuery" placeholder="Search by name, email or ID" aria-label="Search people" style="height:38px"><div class="filter" role="group" aria-label="Access level" id="acFilter"></div></div>
+          <div class="tablewrap"><table><thead><tr><th>Person</th><th>Employee ID</th><th>Access</th></tr></thead><tbody id="acRows"></tbody></table></div>
+          <div class="empty" id="acEmpty" style="border:0">Nobody matches this filter.</div>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -873,8 +922,74 @@ document.addEventListener("click", (e) => {
 });
 $("#pmSelect").addEventListener("change", (e) => { pm.wid = e.target.value; renderProcess(); });
 
+// ================= access management (admin only) =================
+const people = [
+  { name: "Morgan Diaz", email: "demo.supervisor@example.com", empId: "E-1001", role: "manager" },
+  { name: "Jamie Cole", email: "jamie.cole@example.com", empId: "E-1002", role: "admin" },
+  { name: "Sarah Chen", email: "sarah.chen@example.com", empId: "E-1003", role: "employee" },
+  { name: "Marcus Lee", email: "marcus.lee@example.com", empId: "E-1004", role: "employee" },
+  { name: "Priya Nair", email: "priya.nair@example.com", empId: "E-1005", role: "employee" },
+  { name: "Alex Kim", email: "alex.kim@example.com", empId: "E-1006", role: "employee" },
+  { name: "Jordan Patel", email: "jordan.patel@example.com", empId: "E-1007", role: "employee" },
+  { name: "Sam Rivera", email: "sam.rivera@example.com", empId: "E-1008", role: "employee" },
+  { name: "Dana Ortiz", email: "dana.ortiz@example.com", empId: "E-1009", role: "employee" },
+];
+const ROLE_DESC = { employee: "Sees their own workflows and the work assigned to them.", manager: "Sees every workflow, reviews practice sessions and assigns work.", admin: "Everything a manager can do, plus managing access." };
+const ac = { q: "", f: "all", touched: false };
+const canManageAccess = () => me.role === "admin";
+function acFlash(text, bad) { const el = $("#acFlash"); el.textContent = text; el.className = "flash" + (bad ? " bad" : ""); el.style.display = ""; }
+function acProblems() {
+  const name = $("#acName").value.trim(), email = $("#acEmail").value.trim(), id = $("#acEmpId").value.trim();
+  return { name: name.length < 2, email: !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email), empId: !/^[A-Za-z0-9._-]{1,32}$/.test(id) };
+}
+function renderAccess() {
+  $("#acDenied").style.display = canManageAccess() ? "none" : ""; $("#acContent").style.display = canManageAccess() ? "" : "none";
+  if (!canManageAccess()) return;
+  const n = (r) => people.filter((p) => p.role === r).length;
+  $("#acAdmin").textContent = n("admin"); $("#acMgr").textContent = n("manager"); $("#acEmp").textContent = n("employee");
+  $("#acRoleHint").textContent = ROLE_DESC[$("#acRole").value];
+  const pr = acProblems();
+  document.querySelectorAll("[data-err]").forEach((el) => { const bad = ac.touched && pr[el.dataset.err]; el.hidden = !bad; el.previousElementSibling.classList.toggle("bad", !!bad); });
+  const q = ac.q.trim().toLowerCase();
+  const rows = people.filter((p) => (ac.f === "all" || p.role === ac.f) && (!q || p.name.toLowerCase().includes(q) || p.email.toLowerCase().includes(q) || p.empId.toLowerCase().includes(q)));
+  $("#acCount").textContent = rows.length === people.length ? `${people.length} people` : `${rows.length} of ${people.length}`;
+  $("#acFilter").innerHTML = [["all", "All"], ["employee", "Employee"], ["manager", "Manager"], ["admin", "Admin"]].map(([k, l]) => `<button type="button" data-acf="${k}" aria-pressed="${ac.f === k}">${l}<i>${k === "all" ? people.length : n(k)}</i></button>`).join("");
+  $("#acEmpty").style.display = rows.length ? "none" : "block";
+  $("#acRows").innerHTML = rows.map((p) => {
+    const mine = p.email === me.email;
+    return `<tr><td><div class="person-cell"><span class="av2">${initials(p.name)}</span><span><b style="font-weight:500">${esc(p.name)}</b>${mine ? '<span class="you">You</span>' : ""}<span class="sm">${esc(p.email)}</span></span></div></td>
+      <td class="mono">${esc(p.empId)}</td>
+      <td><select class="roleSel" data-acrole="${esc(p.email)}" ${mine ? 'disabled title="You can\'t remove your own admin access"' : ""} aria-label="Access for ${esc(p.name)}">${["employee", "manager", "admin"].map((r) => `<option value="${r}" ${p.role === r ? "selected" : ""}>${ROLE[r]}</option>`).join("")}</select></td></tr>`;
+  }).join("");
+}
+// Changing someone's access also changes what the "Viewing as" switcher shows for them.
+function syncUsers() { const k = $("#meSel").value; $("#meSel").innerHTML = USERS.map((u, i) => `<option value="${i}">${ROLE[u.role]} · ${esc(u.name)}</option>`).join(""); $("#meSel").value = k; }
+document.addEventListener("change", (e) => {
+  if (e.target.id === "acRole") renderAccess();
+  const r = e.target.closest && e.target.closest("[data-acrole]");
+  if (r) {
+    const p = people.find((x) => x.email === r.dataset.acrole); p.role = r.value;
+    const u = USERS.find((x) => x.email === p.email); if (u) { u.role = p.role; syncUsers(); }
+    renderAccess(); acFlash(`${p.name} is now ${ROLE[p.role]}. It applies the next time they sign in, or within an hour.`);
+  }
+});
+document.addEventListener("input", (e) => { if (["acName", "acEmail", "acEmpId"].includes(e.target.id)) renderAccess(); if (e.target.id === "acQuery") { ac.q = e.target.value; renderAccess(); } });
+document.addEventListener("click", (e) => { const f = e.target.closest("[data-acf]"); if (f) { ac.f = f.dataset.acf; renderAccess(); } });
+$("#acForm").addEventListener("submit", (e) => {
+  e.preventDefault(); ac.touched = true;
+  const pr = acProblems(); renderAccess();
+  if (pr.name || pr.email || pr.empId) return;
+  const name = $("#acName").value.trim(), email = $("#acEmail").value.trim().toLowerCase(), empId = $("#acEmpId").value.trim(), role = $("#acRole").value;
+  if (people.some((p) => p.email.toLowerCase() === email)) return acFlash("That email is already a member.", true);
+  if (people.some((p) => p.empId.toLowerCase() === empId.toLowerCase())) return acFlash("That employee ID is already used.", true);
+  people.push({ name, email, empId, role }); people.sort((a, b) => a.name.localeCompare(b.name));
+  $("#acName").value = $("#acEmail").value = $("#acEmpId").value = ""; $("#acRole").value = "employee"; ac.touched = false;
+  renderAccess(); acFlash(`${name} was added as ${ROLE[role]}. They get an email with a temporary password.`);
+});
+
 // ================= viewing as (sketch only) =================
 function renderMe() {
+  $("#navAccess").hidden = !canManageAccess();
   $("#meName").textContent = me.name; $("#meEmail").textContent = me.email; $("#meRole").textContent = ROLE[me.role];
 }
 $("#meSel").innerHTML = USERS.map((u, k) => `<option value="${k}">${ROLE[u.role]} · ${esc(u.name)}</option>`).join("");
@@ -882,11 +997,11 @@ $("#meSel").addEventListener("change", (e) => {
   me = USERS[+e.target.value];
   wf.confirming = null; wf.q = ""; wf.f = "all"; $("#wfQuery").value = ""; document.querySelectorAll("[data-f]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.f === "all"));
   as.picked.clear(); pm.wid = null; if (learners.includes(me.name)) tr.who = me.name;
-  buildFilters(); renderMe(); renderWorkflows(); renderAssign(); render(); renderTraining(); route();
+  buildFilters(); renderMe(); renderWorkflows(); renderAssign(); render(); renderTraining(); renderAccess(); route();
 });
 
 // ================= router =================
-const PAGES = ["workflows", "reviews", "assign", "process", "training"];
+const PAGES = ["workflows", "reviews", "assign", "process", "training", "access"];
 function route() {
   const h = location.hash.slice(1), v = PAGES.includes(h) ? h : h.startsWith("step-") ? "process" : "workflows";
   document.body.dataset.page = v;
@@ -897,6 +1012,7 @@ function route() {
   if (v === "assign") renderAssign();
   if (v === "process") renderProcess();
   if (v === "training") renderTraining();
+  if (v === "access") renderAccess();
   if (!h.startsWith("step-")) window.scrollTo(0, 0);
 }
 window.addEventListener("hashchange", route);
