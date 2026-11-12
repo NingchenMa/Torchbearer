@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { elapsed, resetSession } from "@/lib/events";
-import { loadMastery, loadReviews, saveMastery, saveReviews } from "@/lib/session";
+import { loadMastery, loadMyReviews, saveMastery, saveMyReviews } from "@/lib/session";
 import { requestMic, useVoiceAgent } from "@/lib/useVoiceAgent";
 import type { ReviewItem, StepMastery, WorkMap } from "@/lib/types";
 import { workMapText } from "@/lib/workmapText";
@@ -15,8 +15,7 @@ import { ScreenWatcher, friendly, shareErrorText, type Frame } from "./screenWat
 
 const PAUSE_MS = 2000;
 const IDLE_MS = 15000; // screen still and nobody talking: check in on the new hire
-// No sign-in yet, so every learner shares one progress record. Replace with the signed-in user (Cognito).
-const LEARNER = "New hire";
+// Progress and review items belong to the signed-in person; the server knows who that is.
 
 export type CoachStatus = "idle" | "connecting" | "watching" | "reading" | "speaking" | "done";
 
@@ -36,7 +35,7 @@ export function useCoach(map: WorkMap, workflowId: string) {
   const [previous, setPrevious] = useState<Record<string, StepMastery>>({});
   useEffect(() => {
     let live = true;
-    loadMastery(workflowId, LEARNER).then((m) => live && setPrevious(m));
+    loadMastery(workflowId).then((m) => live && setPrevious(m));
     return () => {
       live = false;
     };
@@ -65,7 +64,7 @@ export function useCoach(map: WorkMap, workflowId: string) {
     if (value === "learned" && masteryRef.current[stepId] === "relearn") return;
     masteryRef.current = { ...masteryRef.current, [stepId]: value };
     setMastery(masteryRef.current);
-    saveMastery(workflowId, LEARNER, { [stepId]: value });
+    saveMastery(workflowId, { [stepId]: value });
   }
 
   const steps = map.steps.map((s) => ({
@@ -118,11 +117,12 @@ export function useCoach(map: WorkMap, workflowId: string) {
           note: data.message ?? "",
           workflowId,
           stepId: data.stepId ?? undefined,
+          stepLabel: step ? `Step ${map.steps.indexOf(step) + 1} · ${step.correction || step.title}` : undefined,
         };
         if (data.stepId) mark(data.stepId, "relearn");
         const next = [...l.reviews, item];
         setReviews(next);
-        saveReviews({ learner: LEARNER, items: [...pendingReviews.current, ...next], submitted: false });
+        saveMyReviews(workflowId, [...pendingReviews.current, ...next]);
         if (data.stepId && !l.flagged.includes(data.stepId)) setFlagged((x) => [...x, data.stepId]);
       }
       if (data.message && (data.verdict === "match" || data.verdict === "different")) {
@@ -193,7 +193,7 @@ export function useCoach(map: WorkMap, workflowId: string) {
     setSessions((n) => n + 1);
     recent.current = [];
     // Keep anything the supervisor hasn't reviewed yet; a submitted batch starts fresh.
-    loadReviews().then((prev) => {
+    loadMyReviews(workflowId).then((prev) => {
       pendingReviews.current = prev && !prev.submitted ? prev.items : [];
     });
     // Ask for screen and microphone in this same click, while this page is in front. Browsers
