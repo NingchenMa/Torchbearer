@@ -102,15 +102,20 @@ export async function listWorkflows(): Promise<WorkflowSummary[]> {
   }
 }
 
-export async function getWorkflow(id: string | null | undefined): Promise<WorkflowRecord | null> {
-  if (!id) return null;
-  if (id === EXAMPLE_ID) return exampleWorkflow();
+/** A workflow, and whether the server refused it because the signed-in person may not open it (403). */
+export async function getWorkflowAccess(id: string | null | undefined): Promise<{ record: WorkflowRecord | null; denied: boolean }> {
+  if (!id) return { record: null, denied: false };
+  if (id === EXAMPLE_ID) return { record: exampleWorkflow(), denied: false };
   try {
     const r = await fetch(`/api/workflows/${encodeURIComponent(id)}`, { cache: "no-store" });
-    return r.ok ? await r.json() : null;
+    return { record: r.ok ? await r.json() : null, denied: r.status === 403 };
   } catch {
-    return null;
+    return { record: null, denied: false };
   }
+}
+
+export async function getWorkflow(id: string | null | undefined): Promise<WorkflowRecord | null> {
+  return (await getWorkflowAccess(id)).record;
 }
 
 export async function saveWorkflow(record: WorkflowRecord): Promise<boolean> {

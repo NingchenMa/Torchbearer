@@ -1,26 +1,49 @@
 "use client";
-// The company's workflow vault: every workflow its experts have taught TorchBearer.
-// Approved workflows can train a new hire right away; drafts go to the Work Map for approval.
-// Any workflow can be deleted (asks once, inline).
+// Workflows: the workflows the signed-in person may see, newest first.
+//   Managers and admins: every workflow at the company, searchable by workflow or expert, with every action
+//     (train a new hire, Work Map, Process map, review and approve, delete) and who is learning each one.
+//   Employees: only the workflows they recorded, with Train a new hire, Work Map and Process map.
+// The server decides what each person gets (/api/workflows); this page only decides how it looks.
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, GitBranch, Map as MapIcon, Search, Trash2, UserRound } from "lucide-react";
-import { CountUp, Segmented, Spotlight, StepTrail } from "@/features/ui/fx";
-import type { WorkflowSummary } from "@/lib/types";
+import { stateOf, todayIso } from "@/lib/assignmentStatus";
+import type { AssignmentView, WorkflowSummary } from "@/lib/types";
+import { useMe } from "@/lib/useMe";
 
 const day = (iso: string) => {
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 };
 
+const btn = "inline-flex h-9 items-center rounded-sm border border-line px-3 text-[14px] text-[#344054] hover:bg-panel";
+const btnPri = "inline-flex h-9 items-center rounded-sm bg-indigo px-3 text-[14px] text-white hover:bg-indigo-dark";
+
 export default function VaultPage() {
+  const { manager, loading: meLoading } = useMe();
   const [list, setList] = useState<WorkflowSummary[] | null>(null);
+  const [assignments, setAssignments] = useState<AssignmentView[]>([]);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "approved" | "draft">("all");
   const [confirming, setConfirming] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [asked, setAsked] = useState<string | null>(null); // an employee pressed "Train a new hire"
+
+  useEffect(() => {
+    fetch("/api/workflows", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((l: WorkflowSummary[]) => setList(l))
+      .catch(() => setList([]));
+  }, []);
+  // Managers also see who is learning each workflow.
+  useEffect(() => {
+    if (!manager) return;
+    fetch("/api/assignments", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((a: AssignmentView[]) => setAssignments(a))
+      .catch(() => {});
+  }, [manager]);
 
   const remove = async (id: string) => {
     setDeleting(id);
@@ -29,6 +52,7 @@ export default function VaultPage() {
       const r = await fetch(`/api/workflows/${encodeURIComponent(id)}`, { method: "DELETE" });
       if (!r.ok) throw new Error();
       setList((l) => (l ?? []).filter((w) => w.id !== id));
+      setAssignments((a) => a.filter((x) => x.workflowId !== id));
       setConfirming(null);
     } catch {
       setDeleteError("Couldn't delete it. Please try again.");
@@ -37,204 +61,145 @@ export default function VaultPage() {
     }
   };
 
-  useEffect(() => {
-    fetch("/api/workflows", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : []))
-      .then((l: WorkflowSummary[]) => setList(l))
-      .catch(() => setList([]));
-  }, []);
-
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
     return (list ?? [])
       .filter((w) => (filter === "all" ? true : filter === "approved" ? w.published : !w.published))
-      .filter((w) => !q || w.name.toLowerCase().includes(q) || (w.trainedBy ?? "").toLowerCase().includes(q))
+      // Searching by expert is for people who can see everyone's workflows.
+      .filter((w) => !q || w.name.toLowerCase().includes(q) || (manager && (w.trainedBy ?? "").toLowerCase().includes(q)))
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-  }, [list, query, filter]);
+  }, [list, query, filter, manager]);
   const approved = (list ?? []).filter((w) => w.published).length;
+  const today = todayIso();
 
-  const drafts = (list?.length ?? 0) - approved;
-  // With "All", workflows waiting for approval come first, as their own group.
-  const groups: [string, WorkflowSummary[]][] =
-    filter === "all"
-      ? ([
-          ["Waiting for your approval", shown.filter((w) => !w.published)],
-          ["Ready to train a new hire", shown.filter((w) => w.published)],
-        ] as [string, WorkflowSummary[]][]).filter(([, g]) => g.length)
-      : [["", shown]];
-  const count = { all: list?.length ?? 0, approved, draft: drafts };
+  if (list === null || meLoading) {
+    return <div className="grid min-h-full place-items-center bg-[#f6f8fc] text-[15px] text-[#667085]">Loading your workflows…</div>;
+  }
 
   return (
-    <div className="min-h-full bg-cream">
-      <section className="tb-hero relative overflow-hidden">
-        <div className="relative mx-auto flex max-w-6xl flex-wrap items-end justify-between gap-6 px-4 pb-8 pt-8 sm:px-6">
-          <div className="tb-rise min-w-0">
-            <h1 className="font-display text-[40px] leading-none text-blush sm:text-[48px]">Workflows</h1>
-            <p className="mt-3 text-[16px] text-blush-2">Recorded by your experts. Approve one, then train a new hire on it.</p>
-            <div className="mt-6 flex flex-wrap gap-2.5">
-              <Link prefetch={false} href="/capture" className="tb-btn-amber h-11">
-                <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-crimson" aria-hidden="true" /> Record a workflow
-              </Link>
-              <Link prefetch={false} href="/review" className="tb-btn-ghost h-11">Supervisor review</Link>
-            </div>
-          </div>
-          {list && list.length > 0 && (
-            <dl className="tb-rise grid grid-cols-3 gap-2.5" style={{ animationDelay: "120ms" }}>
-              {(
-                [
-                  [list.length, "Recorded", "text-blush"],
-                  [drafts, "Need approval", "text-amber"],
-                  [approved, "Ready to train", "text-[#7fd6a4]"],
-                ] as const
-              ).map(([n, label, tone]) => (
-                <div key={label} className="min-w-[96px] rounded-md border border-blush-2/15 bg-white/[.04] px-4 py-3 backdrop-blur-sm">
-                  <dd className={`font-display text-[34px] leading-none ${tone}`}><CountUp to={n} /></dd>
-                  <dt className="mt-1.5 text-[12.5px] text-blush-2">{label}</dt>
-                </div>
-              ))}
-            </dl>
-          )}
-        </div>
-      </section>
-
-      <div className="mx-auto max-w-6xl px-4 py-7 sm:px-6">
-        <div className="flex flex-wrap items-center gap-3">
-          <label className="relative w-full sm:max-w-sm sm:flex-1">
-            <span className="sr-only">Search workflows</span>
-            <Search size={17} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" aria-hidden="true" />
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by workflow or expert"
-              className="h-11 w-full rounded-full border border-line bg-white pl-10 pr-4 text-[15px] outline-none transition-[border-color,box-shadow] focus:border-crimson focus:ring-2 focus:ring-crimson/15"
-            />
-          </label>
-          <div className="max-w-full overflow-x-auto">
-            <Segmented
-              label="Filter"
-              value={filter}
-              onChange={setFilter}
-              options={[
-                { value: "all", label: "All", count: list ? count.all : undefined },
-                { value: "draft", label: "Needs approval", count: list ? count.draft : undefined },
-                { value: "approved", label: "Ready to train", count: list ? count.approved : undefined },
-              ]}
-            />
-          </div>
-        </div>
-
-        {list === null ? (
-          <ul className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3" aria-hidden="true">
-            {[0, 1, 2].map((k) => (
-              <li key={k} className="h-[188px] animate-pulse rounded-lg border border-line bg-white" />
+    <div className="min-h-full bg-[#f6f8fc]">
+      <main className="mx-auto max-w-[1240px] px-4 pb-10 sm:px-7">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-3 pb-5 pt-6">
+          <h1 className="mr-auto text-[26px] font-medium leading-tight text-[#1f2d3d]">Workflows</h1>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={manager ? "Search by workflow or expert" : "Search your workflows"}
+            aria-label="Search workflows"
+            className="h-10 w-full min-w-0 rounded-sm border border-line bg-white px-3 text-[15px] outline-none focus:border-indigo sm:w-auto sm:min-w-52"
+          />
+          <div className="flex rounded-sm border border-line bg-white text-[14px]" role="group" aria-label="Filter">
+            {(["all", "approved", "draft"] as const).map((f) => (
+              <button key={f} onClick={() => setFilter(f)} aria-pressed={filter === f} className={`h-10 px-3 ${filter === f ? "bg-indigo-soft font-medium text-indigo" : "text-[#475467] hover:bg-panel"}`}>
+                {f === "all" ? "All" : f === "approved" ? "Ready to teach" : "Needs approval"}
+              </button>
             ))}
-          </ul>
-        ) : list.length === 0 ? (
-          <div className="mt-6 rounded-lg border border-line bg-white px-6 py-12 text-center">
-            <h2 className="font-display text-[30px] leading-tight text-ink">
-              No workflows <span className="font-serif italic text-crimson">yet.</span>
-            </h2>
-            <p className="mx-auto mt-3 max-w-md text-[16px] leading-relaxed text-muted">
-              Ask an experienced colleague to record a task they know well. TorchBearer watches, asks why, and builds a Work Map you can
-              train from.
+          </div>
+          <Link prefetch={false} href="/capture" className="inline-flex h-10 items-center rounded-sm bg-indigo px-4 text-[15px] text-white hover:bg-indigo-dark">
+            ● Record a new workflow
+          </Link>
+        </div>
+
+        <section className="mb-5 grid gap-4 sm:grid-cols-3" aria-label="Summary">
+          {([["Workflows", (list ?? []).length, "text-[#1f2d3d]"], ["Ready to teach", approved, "text-ok"], ["Needs approval", (list ?? []).length - approved, "text-[#7a5a00]"]] as const).map(([label, n, color]) => (
+            <div key={label} className="rounded-md border border-line bg-white px-4 py-3">
+              <span className="block text-[12px] font-bold uppercase tracking-[.06em] text-[#667085]">{label}</span>
+              <b className={`text-[26px] font-medium leading-[1.3] ${color}`}>{n}</b>
+            </div>
+          ))}
+        </section>
+
+        {list.length === 0 ? (
+          <div className="rounded-md border border-dashed border-[#c9c6f5] bg-white p-8 text-center">
+            <h2 className="text-[18px] font-medium text-[#1f2d3d]">No workflows yet</h2>
+            <p className="mx-auto mt-2 max-w-md text-[15px] text-[#475467]">
+              {manager
+                ? "Ask an experienced colleague to record a task they know well. Torchbearer watches, asks whenever something isn't clear, and turns it into a Work Map you can teach from."
+                : "Workflows you record appear here. Record a task you know well and Torchbearer turns it into a Work Map."}
             </p>
-            <Link prefetch={false} href="/capture" className="tb-btn-amber mt-6 h-11">Record the first workflow</Link>
+            <Link prefetch={false} href="/capture" className="mt-5 inline-flex h-10 items-center rounded-sm bg-indigo px-4 text-[15px] text-white hover:bg-indigo-dark">
+              Record {manager ? "the first" : "a"} workflow
+            </Link>
           </div>
         ) : shown.length === 0 ? (
-          <p className="mt-10 text-[16px] text-muted">No workflows match &ldquo;{query}&rdquo;.</p>
+          <p className="mt-10 text-[15px] text-[#667085]">No workflows match.</p>
         ) : (
-          groups.map(([title, items]) => (
-            <section key={title || "list"} className="mt-8">
-              {title && (
-                <h2 className="mb-4 flex items-baseline gap-2.5 font-display text-[24px] text-ink">
-                  {title}
-                  <span className="font-sans text-[14px] tabular-nums text-muted">{items.length}</span>
-                </h2>
-              )}
-              <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {items.map((w, k) => (
-                  <Spotlight
-                    as="li"
-                    key={w.id}
-                    style={{ animationDelay: `${Math.min(k, 9) * 50}ms` }}
-                    className="tb-rise flex flex-col rounded-lg border border-line bg-white p-5 shadow-[0_1px_2px_rgba(58,11,20,.04)] transition-[transform,box-shadow] duration-300 ease-out hover:-translate-y-1 hover:shadow-[0_18px_40px_rgba(58,11,20,.12)]"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <h3 className="min-w-0 font-display text-[22px] leading-tight text-ink [text-wrap:balance]">{w.name || "Untitled workflow"}</h3>
-                      <span className={`mt-1 shrink-0 text-[12px] font-bold uppercase tracking-[.1em] ${w.published ? "text-ok" : "text-[#a06d00]"}`}>
-                        {w.published ? "Ready" : "Draft"}
-                      </span>
-                    </div>
-                    <div className="mt-4">
-                      <StepTrail count={w.stepCount} lit={!!w.published} />
-                      <p className="mt-2 text-[13.5px] text-muted">
-                        {w.stepCount} step{w.stepCount === 1 ? "" : "s"}
-                        {day(w.createdAt) ? ` · ${day(w.createdAt)}` : ""}
-                      </p>
-                    </div>
-                    {w.trainedBy && (
-                      <p className="mt-3 flex items-center gap-2 text-[14px] text-muted">
-                        <span className="grid h-7 w-7 place-items-center rounded-full bg-cream text-crimson">
-                          <UserRound size={15} aria-hidden="true" />
-                        </span>
-                        Taught by <span className="font-serif italic text-crimson">{w.trainedBy}</span>
-                      </p>
+          <ul className="grid gap-3 md:grid-cols-2">
+            {shown.map((w) => {
+              const learning = assignments.filter((a) => a.workflowId === w.id && stateOf(a, today) !== "done");
+              const late = learning.filter((a) => stateOf(a, today) === "late").length;
+              return (
+                <li key={w.id} className="flex flex-col rounded-md border border-line bg-white p-4 shadow-[0_4px_14px_rgba(16,24,40,.04)]">
+                  <div className="flex items-start justify-between gap-3">
+                    <h2 className="min-w-0 text-[16.5px] font-medium leading-snug text-[#1f2d3d]">{w.name || "Untitled workflow"}</h2>
+                    {w.published ? (
+                      <span className="pill shrink-0 rounded-full bg-ok-soft text-ok">Ready to teach</span>
+                    ) : (
+                      <span className="pill shrink-0 rounded-full bg-warn-soft text-[#7a5a00]">Needs approval</span>
                     )}
-
-                    <div className="mt-auto pt-5">
-                      {confirming === w.id ? (
-                        <div className="rounded-md border border-[#f3c2c2] bg-err-soft px-3 py-2.5" role="alert">
-                          <p className="text-[14px] text-[#8E1B1B]">{deleteError ?? "Delete this workflow? This can\u2019t be undone."}</p>
-                          <div className="mt-2 flex gap-2">
-                            <button
-                              onClick={() => remove(w.id)}
-                              disabled={deleting === w.id}
-                              className="inline-flex h-10 items-center rounded-full bg-err px-4 text-[14px] font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
-                            >
-                              {deleting === w.id ? "Deleting…" : "Delete"}
-                            </button>
-                            <button onClick={() => { setConfirming(null); setDeleteError(null); }} className="tb-btn-line h-10">
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
-                          <Link
-                            prefetch={false}
-                            href={w.published ? `/teach?id=${encodeURIComponent(w.id)}` : `/map?id=${encodeURIComponent(w.id)}`}
-                            className="tb-btn-dark group/btn h-10"
-                          >
-                            {w.published ? "Train a new hire" : "Review and approve"}
-                            <ArrowRight size={16} className="transition-transform duration-200 group-hover/btn:translate-x-1" aria-hidden="true" />
-                          </Link>
-                          {w.published && (
-                            <Link prefetch={false} href={`/map?id=${encodeURIComponent(w.id)}`} className="grid h-10 w-10 place-items-center rounded-full border border-line text-ink transition-colors hover:border-crimson/40 hover:text-crimson" title="Work Map" aria-label="Work Map">
-                              <MapIcon size={17} aria-hidden="true" />
-                            </Link>
-                          )}
-                          <Link prefetch={false} href={`/process?id=${encodeURIComponent(w.id)}`} className="grid h-10 w-10 place-items-center rounded-full border border-line text-ink transition-colors hover:border-crimson/40 hover:text-crimson" title="Process map" aria-label="Process map">
-                            <GitBranch size={17} aria-hidden="true" />
-                          </Link>
-                          <button
-                            onClick={() => { setConfirming(w.id); setDeleteError(null); }}
-                            className="ml-auto grid h-10 w-10 place-items-center rounded-full text-muted transition-colors hover:bg-err-soft hover:text-err"
-                            aria-label={`Delete ${w.name || "workflow"}`}
-                            title="Delete"
-                          >
-                            <Trash2 size={17} aria-hidden="true" />
-                          </button>
-                        </div>
-                      )}
+                  </div>
+                  <p className="mt-1 text-[13.5px] text-[#667085]">
+                    {w.stepCount} step{w.stepCount === 1 ? "" : "s"}
+                    {manager ? (w.trainedBy ? ` · taught by ${w.trainedBy}` : "") : " · recorded by you"}
+                    {day(w.createdAt) ? ` · ${day(w.createdAt)}` : ""}
+                  </p>
+                  {manager && learning.length > 0 && (
+                    <div className="mt-2.5 flex flex-wrap gap-1.5">
+                      <Link href={`/assign?workflow=${encodeURIComponent(w.id)}`} className="rounded-sm bg-indigo-soft px-2 py-px text-[12.5px] text-indigo">{learning.length} learning it</Link>
+                      {late > 0 && <Link href={`/assign?workflow=${encodeURIComponent(w.id)}`} className="rounded-sm bg-err-soft px-2 py-px text-[12.5px] text-err">{late} overdue</Link>}
                     </div>
-                  </Spotlight>
-                ))}
-              </ul>
-            </section>
-          ))
+                  )}
+                  {manager && confirming === w.id ? (
+                    <div className="mt-4 rounded-sm border border-[#f3c2c2] bg-err-soft px-3 py-2.5" role="alert">
+                      <p className="text-[14px] text-[#8E1B1B]">
+                        Delete &ldquo;{w.name || "Untitled workflow"}&rdquo;? This can&apos;t be undone.
+                        {learning.length > 0 && ` It also removes ${learning.length} assignment${learning.length === 1 ? "" : "s"}.`}
+                      </p>
+                      {deleteError && <p className="mt-1 text-[13px] text-[#8E1B1B]">{deleteError}</p>}
+                      <div className="mt-2 flex gap-2">
+                        <button onClick={() => remove(w.id)} disabled={deleting === w.id} className="inline-flex h-9 items-center rounded-sm bg-err px-3 text-[14px] text-white hover:opacity-90 disabled:opacity-60">
+                          {deleting === w.id ? "Deleting…" : "Delete"}
+                        </button>
+                        <button onClick={() => { setConfirming(null); setDeleteError(null); }} className={`${btn} bg-white`}>Cancel</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="mt-4 flex flex-wrap items-center gap-2">
+                        {w.published ? (
+                          <>
+                            {manager ? (
+                              <Link prefetch={false} href={`/assign?workflow=${encodeURIComponent(w.id)}`} className={btnPri}>Train a new hire</Link>
+                            ) : (
+                              <button onClick={() => setAsked(asked === w.id ? null : w.id)} className={btnPri}>Train a new hire</button>
+                            )}
+                            <Link prefetch={false} href={`/map?id=${encodeURIComponent(w.id)}`} className={btn}>View Work Map</Link>
+                          </>
+                        ) : (
+                          <Link prefetch={false} href={`/map?id=${encodeURIComponent(w.id)}`} className="inline-flex h-9 items-center rounded-sm border border-indigo px-3 text-[14px] text-indigo hover:bg-indigo-soft">
+                            Review and approve
+                          </Link>
+                        )}
+                        <Link prefetch={false} href={`/process?id=${encodeURIComponent(w.id)}`} className={btn}>Process map</Link>
+                        {manager && (
+                          <button onClick={() => { setConfirming(w.id); setDeleteError(null); }} className="ml-auto inline-flex h-9 items-center rounded-sm px-2 text-[14px] text-[#667085] hover:bg-err-soft hover:text-err" aria-label={`Delete ${w.name || "workflow"}`}>
+                            Delete
+                          </button>
+                        )}
+                      </div>
+                      {asked === w.id && (
+                        <p className="mt-3 rounded-sm bg-indigo-soft px-3 py-2 text-[14px] text-[#3b3399]" role="status">
+                          Only managers can assign workflows. Ask a manager to give this one to a new hire.
+                        </p>
+                      )}
+                    </>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         )}
-      </div>
+      </main>
     </div>
   );
 }

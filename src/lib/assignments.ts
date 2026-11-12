@@ -5,6 +5,8 @@ import { orgDb, safe } from "./db";
 import type { Assignment, AssignmentView, StepMastery, WorkflowSummary } from "./types";
 import { WORKFLOW_INDEX } from "./workflows";
 
+export { isDone } from "./assignmentStatus";
+
 export const ASSIGNMENTS = "assignments/index.json";
 export const progressPath = (workflowId: string, learnerId: string) => `progress/${safe(workflowId)}/${safe(learnerId)}.json`;
 
@@ -40,4 +42,3 @@ export async function withProgress(org: string, list: Assignment[]): Promise<Ass
   return views.filter((v): v is AssignmentView => v !== null);
 }
 
-export const isDone = (a: Pick<AssignmentView, "learned" | "stepCount">) => a.stepCount > 0 && a.learned >= a.stepCount;
