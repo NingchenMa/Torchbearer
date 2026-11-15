@@ -9,6 +9,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import NoAccess from "@/features/nav/NoAccess";
+import { CountUp, Segmented } from "@/features/ui/fx";
 import { ROLE_LABEL, type Role } from "@/lib/roles";
 import type { Member } from "@/lib/types";
 import { useMe } from "@/lib/useMe";
@@ -23,12 +24,12 @@ const initials = (n: string) => n.split(/\s+/).map((p) => p[0]).join("").slice(0
 
 export default function AccessPage() {
   const { me, loading } = useMe();
-  if (loading) return <div className="grid min-h-full place-items-center bg-[#f6f8fc] text-[15px] text-[#667085]">Loading…</div>;
+  if (loading) return <div className="grid min-h-full place-items-center bg-cream text-[15px] text-muted">Loading…</div>;
   if (me?.role !== "admin") {
     return (
-      <div className="min-h-full bg-[#f6f8fc]">
+      <div className="min-h-full bg-cream">
         <div className="mx-auto max-w-[1240px] px-4 sm:px-7">
-          <h1 className="pb-1 pt-6 text-[26px] font-medium leading-tight text-[#1f2d3d]">Access management</h1>
+          <h1 className="pb-1 pt-7 font-display text-[36px] leading-none text-ink">Access management</h1>
           <NoAccess message="You lack access to manage access." />
         </div>
       </div>
@@ -115,22 +116,22 @@ function Access({ myId }: { myId: string }) {
     }
   }
 
-  const panel = "rounded-md border border-line bg-white shadow-[0_4px_14px_rgba(16,24,40,.04)]";
-  const panelHead = "flex items-center gap-2.5 rounded-t-md border-b border-line bg-panel-2 px-4 py-3 text-[13px] font-bold uppercase tracking-[.05em] text-[#444]";
-  const label = "mb-1.5 block text-[12px] font-bold uppercase tracking-[.06em] text-[#667085]";
-  const input = (bad: string) => `h-10 w-full rounded-sm border bg-white px-3 focus:border-indigo focus:outline-none ${touched && bad ? "border-err" : "border-[#9aa0a6]"}`;
+  const panel = "rounded-lg border border-line bg-white shadow-[0_4px_14px_rgba(16,24,40,.04)]";
+  const panelHead = "flex items-center gap-2.5 rounded-t-lg border-b border-line bg-cream px-4 py-3 text-[13px] font-bold uppercase tracking-[.05em] text-ink/80";
+  const label = "mb-1.5 block text-[12px] font-bold uppercase tracking-[.06em] text-muted";
+  const input = (bad: string) => `h-10 w-full rounded-md border bg-white px-3 focus:border-indigo focus:outline-none ${touched && bad ? "border-err" : "border-blush-2"}`;
   const err = (m: string) => (touched && m ? <p className="mt-1 text-[13px] text-err">{m}</p> : null);
 
   return (
-    <div className="min-h-full bg-[#f6f8fc]">
+    <div className="min-h-full bg-cream">
       <div className="mx-auto max-w-[1240px] px-4 pb-10 sm:px-7">
-        <h1 className="pb-5 pt-6 text-[26px] font-medium leading-tight text-[#1f2d3d]">Access management</h1>
+        <h1 className="pb-5 pt-7 font-display text-[36px] leading-none text-ink">Access management</h1>
 
         <section className="mb-5 grid gap-4 sm:grid-cols-3" aria-label="Summary">
           {ROLES.slice().reverse().map((r) => (
-            <div key={r} className="rounded-md border border-line bg-white px-4 py-3">
-              <span className="block text-[12px] font-bold uppercase tracking-[.06em] text-[#667085]">{ROLE_LABEL[r]}s</span>
-              <b className="text-[26px] font-medium leading-[1.3] text-[#1f2d3d]">{count(r)}</b>
+            <div key={r} className="rounded-lg border border-line bg-white px-5 py-4">
+              <span className="block text-[12px] font-bold uppercase tracking-[.1em] text-muted">{ROLE_LABEL[r]}s</span>
+              <b className="mt-1 block font-display text-[36px] font-normal leading-none text-ink"><CountUp to={count(r)} /></b>
             </div>
           ))}
         </section>
@@ -160,13 +161,13 @@ function Access({ myId }: { myId: string }) {
               </div>
               <div>
                 <label htmlFor="m-role" className={label}>Access level <span className="text-err">*</span></label>
-                <select id="m-role" value={role} onChange={(e) => setRole(e.target.value as Role)} className="h-10 w-full rounded-sm border border-[#9aa0a6] bg-white px-3">
+                <select id="m-role" value={role} onChange={(e) => setRole(e.target.value as Role)} className="h-10 w-full rounded-md border border-blush-2 bg-white px-3">
                   {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
                 </select>
-                <p className="mt-1.5 text-[13px] text-[#667085]">{DESCRIPTION[role]}</p>
+                <p className="mt-1.5 text-[13px] text-muted">{DESCRIPTION[role]}</p>
               </div>
-              <p className="rounded-md bg-panel-2 px-3 py-2.5 text-[13.5px] text-[#667085]">They get an email with a temporary password and choose their own when they first sign in.</p>
-              <button type="submit" disabled={saving} className="h-10 rounded-sm border border-indigo bg-indigo px-4 text-[15px] text-white hover:bg-indigo-dark disabled:opacity-50">
+              <p className="rounded-md bg-cream px-3 py-2.5 text-[13.5px] text-muted">They get an email with a temporary password and choose their own when they first sign in.</p>
+              <button type="submit" disabled={saving} className="tb-btn-amber h-11">
                 {saving ? "Adding…" : "Add member"}
               </button>
             </div>
@@ -175,23 +176,23 @@ function Access({ myId }: { myId: string }) {
           <div className={panel}>
             <h2 className={panelHead}>
               People
-              <span className="ml-auto text-[13px] font-normal normal-case tracking-normal text-[#667085]">{shown.length === all.length ? `${all.length} ${all.length === 1 ? "person" : "people"}` : `${shown.length} of ${all.length}`}</span>
+              <span className="ml-auto text-[13px] font-normal normal-case tracking-normal text-muted">{shown.length === all.length ? `${all.length} ${all.length === 1 ? "person" : "people"}` : `${shown.length} of ${all.length}`}</span>
             </h2>
             <div className="flex flex-wrap items-center gap-2.5 border-b border-line px-4 py-3">
-              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by name, email or ID" aria-label="Search people" className="h-[38px] min-w-44 flex-1 rounded-sm border border-line px-3 text-[14px] focus:border-indigo focus:outline-none" />
-              <div className="flex flex-wrap rounded-sm border border-line bg-white text-[14px]" role="group" aria-label="Access level">
-                {(["all", ...ROLES] as const).map((k) => (
-                  <button key={k} onClick={() => setFilter(k)} aria-pressed={filter === k} className={`h-[38px] px-3 ${filter === k ? "bg-indigo-soft font-medium text-indigo" : "text-[#475467]"}`}>
-                    {k === "all" ? "All" : ROLE_LABEL[k]}
-                    <i className="ml-1.5 text-[12.5px] not-italic text-[#98a2b3]">{k === "all" ? all.length : count(k)}</i>
-                  </button>
-                ))}
+              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by name, email or ID" aria-label="Search people" className="h-10 min-w-44 flex-1 rounded-full border border-line px-4 text-[14px] outline-none focus:border-crimson" />
+              <div className="max-w-full overflow-x-auto">
+                <Segmented
+                  label="Access level"
+                  value={filter}
+                  onChange={setFilter}
+                  options={(["all", ...ROLES] as const).map((k) => ({ value: k, label: k === "all" ? "All" : ROLE_LABEL[k], count: k === "all" ? all.length : count(k) }))}
+                />
               </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-[14px]">
                 <thead>
-                  <tr className="border-b border-line text-left text-[12px] font-bold uppercase tracking-[.06em] text-[#667085]">
+                  <tr className="border-b border-line text-left text-[12px] font-bold uppercase tracking-[.06em] text-muted">
                     <th className="px-4 py-2.5">Person</th><th className="px-3 py-2.5">Employee ID</th><th className="px-3 py-2.5">Access</th>
                   </tr>
                 </thead>
@@ -203,12 +204,12 @@ function Access({ myId }: { myId: string }) {
                           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-indigo-soft text-[11.5px] font-medium text-indigo">{initials(m.name)}</span>
                           <span className="min-w-0">
                             <b className="font-medium">{m.name}</b>
-                            {m.id === myId && <span className="ml-2 rounded-full bg-[#eef0f3] px-2 text-[12px] text-[#475467]">You</span>}
-                            <span className="block truncate text-[12.5px] text-[#667085]">{m.email}</span>
+                            {m.id === myId && <span className="ml-2 rounded-full bg-blush px-2 text-[12px] text-ink/75">You</span>}
+                            <span className="block truncate text-[12.5px] text-muted">{m.email}</span>
                           </span>
                         </div>
                       </td>
-                      <td className="px-3 py-3 align-middle font-mono text-[13px] text-[#475467]">{m.employeeId ?? "–"}</td>
+                      <td className="px-3 py-3 align-middle font-mono text-[13px] text-ink/75">{m.employeeId ?? "–"}</td>
                       <td className="px-3 py-3 align-middle">
                         <select
                           value={m.role}
@@ -216,7 +217,7 @@ function Access({ myId }: { myId: string }) {
                           disabled={m.id === myId}
                           title={m.id === myId ? "You can't remove your own admin access" : undefined}
                           aria-label={`Access for ${m.name}`}
-                          className="h-9 rounded-sm border border-[#9aa0a6] bg-white px-2.5 text-[14px] disabled:bg-panel disabled:text-[#98a2b3]"
+                          className="h-9 rounded-md border border-blush-2 bg-white px-2.5 text-[14px] disabled:bg-cream disabled:text-muted/70"
                         >
                           {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
                         </select>
@@ -226,8 +227,8 @@ function Access({ myId }: { myId: string }) {
                 </tbody>
               </table>
             </div>
-            {members === null && <p className="p-8 text-center text-[#667085]">Loading…</p>}
-            {members !== null && shown.length === 0 && <p className="p-8 text-center text-[#475467]">{all.length ? "Nobody matches this filter." : "No one yet. Add the first member on the left."}</p>}
+            {members === null && <p className="p-8 text-center text-muted">Loading…</p>}
+            {members !== null && shown.length === 0 && <p className="p-8 text-center text-ink/75">{all.length ? "Nobody matches this filter." : "No one yet. Add the first member on the left."}</p>}
           </div>
         </div>
       </div>

@@ -6,6 +6,7 @@
 // correction, can add a note for the new hire, and submits. A submitted review settles the step.
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { CountUp, Segmented } from "@/features/ui/fx";
 import { loadReviewBatches, saveReviewDecisions } from "@/lib/session";
 import type { ReviewBatch, ReviewItem } from "@/lib/types";
 import { useMe } from "@/lib/useMe";
@@ -78,42 +79,45 @@ export default function ReviewPage() {
   }
 
   if (batches === null) {
-    return <div className="grid min-h-full place-items-center bg-[#f6f8fc] text-[15px] text-[#667085]">Loading reviews…</div>;
+    return <div className="grid min-h-full place-items-center bg-cream text-[15px] text-muted">Loading reviews…</div>;
   }
 
   return (
-    <div className="min-h-full bg-[#f6f8fc] pb-24">
+    <div className="min-h-full bg-cream pb-24">
       <div className="mx-auto max-w-[1240px] px-4 sm:px-7">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-3 pb-5 pt-6">
-          <h1 className="mr-auto text-[26px] font-medium leading-tight text-[#1f2d3d]">Reviews</h1>
-          <select value={learner} onChange={(e) => setLearner(e.target.value)} aria-label="Learner" className="h-10 rounded-sm border border-[#9aa0a6] bg-white px-3">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-3 pb-5 pt-7">
+          <h1 className="mr-auto font-display text-[36px] leading-none text-ink">Reviews</h1>
+          <select value={learner} onChange={(e) => setLearner(e.target.value)} aria-label="Learner" className="h-11 rounded-full border border-line bg-white px-4 outline-none focus:border-crimson">
             <option value="">All learners</option>
             {learners.map((n) => <option key={n}>{n}</option>)}
           </select>
-          <select value={workflow} onChange={(e) => setWorkflow(e.target.value)} aria-label="Workflow" className="h-10 rounded-sm border border-[#9aa0a6] bg-white px-3">
+          <select value={workflow} onChange={(e) => setWorkflow(e.target.value)} aria-label="Workflow" className="h-11 rounded-full border border-line bg-white px-4 outline-none focus:border-crimson">
             <option value="">All workflows</option>
             {workflows.map((n) => <option key={n}>{n}</option>)}
           </select>
-          <div className="flex h-10 overflow-hidden rounded-sm border border-[#9aa0a6] bg-white" role="group" aria-label="Show">
-            {([["all", "All"], ["open", "Undecided"], ["done", "Decided"]] as const).map(([v, label], i) => (
-              <button key={v} onClick={() => setView(v)} aria-pressed={view === v} className={`px-4 ${i ? "border-l border-line" : ""} ${view === v ? "bg-indigo text-white" : "text-[#475467] hover:bg-panel"}`}>
-                {label}
-              </button>
-            ))}
-          </div>
+          <Segmented
+            label="Show"
+            value={view}
+            onChange={setView}
+            options={[
+              { value: "all", label: "All", count: rows.length },
+              { value: "open", label: "Undecided", count: undecided },
+              { value: "done", label: "Decided", count: fine + needs },
+            ]}
+          />
         </div>
 
         <section className="mb-5 grid gap-4 sm:grid-cols-3" aria-label="Summary">
           {([["Under review", undecided, "text-[#7a5a00]"], ["Fine as it is", fine, "text-ok"], ["Needs correction", needs, "text-err"]] as const).map(([label, n, color]) => (
-            <div key={label} className="rounded-md border border-line bg-white px-4 py-3">
-              <span className="block text-[12px] font-bold uppercase tracking-[.06em] text-[#667085]">{label}</span>
-              <b className={`text-[26px] font-medium leading-[1.3] ${color}`}>{n}</b>
+            <div key={label} className="rounded-lg border border-line bg-white px-5 py-4">
+              <span className="block text-[12px] font-bold uppercase tracking-[.1em] text-muted">{label}</span>
+              <b className={`mt-1 block font-display text-[36px] font-normal leading-none ${color}`}><CountUp to={n} /></b>
             </div>
           ))}
         </section>
 
         {shown.length === 0 && (
-          <div className="rounded-md border border-line bg-white p-8 text-center text-[15px] text-[#475467]">
+          <div className="rounded-md border border-line bg-white p-8 text-center text-[15px] text-ink/75">
             {rows.length === 0
               ? manager
                 ? "Nothing under review yet. Items appear here when a new hire practises in Training."
@@ -126,10 +130,10 @@ export default function ReviewPage() {
           const left = list.filter((r) => !r.item.decision).length;
           return (
             <div key={name} className="mb-2">
-              <div className="mb-3 mt-5 flex items-center gap-3 rounded-md border border-[#bcd8f5] bg-brand-soft px-4 py-2.5 text-[15px] font-medium text-[#1f2d3d] first:mt-0">
+              <div className="mb-3 mt-5 flex items-center gap-3 rounded-md border border-blush-2/60 bg-blush px-4 py-2.5 text-[15px] font-medium text-ink first:mt-0">
                 <span className="grid h-[30px] w-[30px] place-items-center rounded-full bg-white text-[11.5px] font-bold">{initials(name)}</span>
                 {name} · {left} to review
-                <button onClick={() => setCollapsed((c) => ({ ...c, [name]: !c[name] }))} className="ml-auto text-[14px] font-normal text-[#475467]">
+                <button onClick={() => setCollapsed((c) => ({ ...c, [name]: !c[name] }))} className="ml-auto text-[14px] font-normal text-ink/75">
                   {collapsed[name] ? "Expand ▾" : "Collapse ▴"}
                 </button>
               </div>
@@ -148,8 +152,8 @@ export default function ReviewPage() {
 
       {open.length > 0 && (
         <div className="fixed bottom-0 left-16 right-0 z-10 flex h-16 items-center justify-end gap-3 border-t border-line bg-white/95 px-4 sm:px-7 md:left-60">
-          <span className="text-[14px] text-[#667085]">{decidedOpen}/{open.length} decided</span>
-          <button onClick={submit} disabled={decidedOpen < open.length || submitting} className="h-11 rounded-sm bg-indigo px-5 text-[15px] text-white hover:bg-indigo-dark disabled:opacity-40">
+          <span className="text-[14px] text-muted">{decidedOpen}/{open.length} decided</span>
+          <button onClick={submit} disabled={decidedOpen < open.length || submitting} className="tb-btn-amber h-11">
             {submitting ? "Submitting…" : "Submit review"}
           </button>
         </div>
@@ -163,14 +167,14 @@ function ReviewCard({ batch, item, n, onChange }: { batch: ReviewBatch; item: Re
   return (
     <li className="grid overflow-hidden rounded-md border border-line bg-white shadow-[0_4px_14px_rgba(16,24,40,.04)] lg:grid-cols-[232px_minmax(0,1fr)_280px]">
       <div className="flex flex-col items-center gap-1.5 p-4 pb-2 lg:pb-4 lg:pr-0">
-        <div className="relative min-h-[150px] w-full flex-1 overflow-hidden rounded-md border border-[#cbd5e1] bg-[#eef2f6]">
+        <div className="relative min-h-[150px] w-full flex-1 overflow-hidden rounded-md border border-blush-2 bg-blush">
           {item.screenshot ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={item.screenshot} alt={`New hire's screen at ${item.time}`} className="absolute inset-0 h-full w-full object-cover object-top" />
           ) : (
-            <div className="grid h-full min-h-[150px] place-items-center text-[13px] text-[#667085]">No screenshot</div>
+            <div className="grid h-full min-h-[150px] place-items-center text-[13px] text-muted">No screenshot</div>
           )}
-          <span className="absolute bottom-2 left-2 rounded-sm bg-black/60 px-2 py-0.5 font-mono text-[12px] text-white">{item.time}</span>
+          <span className="absolute bottom-2 left-2 rounded-md bg-black/60 px-2 py-0.5 font-mono text-[12px] text-white">{item.time}</span>
         </div>
         {item.screenshot && (
           <a href={item.screenshot} target="_blank" rel="noreferrer" className="text-[13px] text-brand hover:underline">View full size</a>
@@ -178,35 +182,35 @@ function ReviewCard({ batch, item, n, onChange }: { batch: ReviewBatch; item: Re
       </div>
 
       <div className="flex min-w-0 flex-col gap-3 px-5 py-4">
-        <div className="text-[15px] text-[#1f2d3d]">
+        <div className="text-[15px] text-ink">
           <b className="font-medium">{batch.workflowName}</b>
-          {item.stepLabel && <span className="text-[#475467]"> › {item.stepLabel}</span>}
-          <span className="mt-0.5 block text-[13px] text-[#98a2b3]">Training session · #{n}</span>
+          {item.stepLabel && <span className="text-ink/75"> › {item.stepLabel}</span>}
+          <span className="mt-0.5 block text-[13px] text-muted/70">Training session · #{n}</span>
         </div>
         <div className="grid flex-1 gap-3 sm:grid-cols-2">
           <div className="rounded-md border border-line bg-white px-3.5 py-2.5 text-[15px] leading-[1.45]">
-            <span className="mb-1 block text-[12px] font-bold uppercase tracking-[.06em] text-[#667085]">What the new hire did</span>
+            <span className="mb-1 block text-[12px] font-bold uppercase tracking-[.06em] text-muted">What the new hire did</span>
             {item.observed}
           </div>
-          <div className="rounded-md border border-[#dcd9fb] bg-indigo-soft px-3.5 py-2.5 text-[15px] leading-[1.45]">
-            <span className="mb-1 block text-[12px] font-bold uppercase tracking-[.06em] text-[#667085]">What the expert did</span>
+          <div className="rounded-md border border-blush-2/60 bg-indigo-soft px-3.5 py-2.5 text-[15px] leading-[1.45]">
+            <span className="mb-1 block text-[12px] font-bold uppercase tracking-[.06em] text-muted">What the expert did</span>
             {item.expected}
           </div>
         </div>
-        {item.note && <p className="text-[13.5px] italic text-[#667085]">✦ Note: {item.note}</p>}
+        {item.note && <p className="text-[13.5px] italic text-muted">✦ Note: {item.note}</p>}
       </div>
 
       <div className="flex flex-col gap-2.5 border-t border-line p-4 lg:border-l lg:border-t-0">
         <span className={`w-fit rounded-full px-3 py-[3px] text-[13px] font-medium ${state[0]}`}>{state[1]}</span>
         {batch.submitted ? (
-          item.comment && <p className="text-[14px] text-[#475467]"><b className="font-medium">Note:</b> {item.comment}</p>
+          item.comment && <p className="text-[14px] text-ink/75"><b className="font-medium">Note:</b> {item.comment}</p>
         ) : (
           <>
             <div className="grid grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-2">
-              <button onClick={() => onChange({ decision: "fine" })} aria-pressed={item.decision === "fine"} className={`h-10 whitespace-nowrap rounded-sm border px-2 text-[14px] font-medium ${item.decision === "fine" ? "border-ok bg-ok text-white" : "border-ok bg-white text-ok hover:bg-ok-soft"}`}>
+              <button onClick={() => onChange({ decision: "fine" })} aria-pressed={item.decision === "fine"} className={`h-10 whitespace-nowrap rounded-full border px-2 text-[14px] font-medium ${item.decision === "fine" ? "border-ok bg-ok text-white" : "border-ok bg-white text-ok hover:bg-ok-soft"}`}>
                 ✓ Fine
               </button>
-              <button onClick={() => onChange({ decision: "needs_correction" })} aria-pressed={item.decision === "needs_correction"} className={`h-10 whitespace-nowrap rounded-sm border px-2 text-[14px] font-medium ${item.decision === "needs_correction" ? "border-err bg-err text-white" : "border-err bg-white text-err hover:bg-err-soft"}`}>
+              <button onClick={() => onChange({ decision: "needs_correction" })} aria-pressed={item.decision === "needs_correction"} className={`h-10 whitespace-nowrap rounded-full border px-2 text-[14px] font-medium ${item.decision === "needs_correction" ? "border-err bg-err text-white" : "border-err bg-white text-err hover:bg-err-soft"}`}>
                 ⚑ Needs correction
               </button>
             </div>
@@ -215,7 +219,7 @@ function ReviewCard({ batch, item, n, onChange }: { batch: ReviewBatch; item: Re
               onChange={(e) => onChange({ comment: e.target.value })}
               placeholder="Add a note for the new hire (optional)"
               aria-label="Note for the new hire"
-              className="min-h-16 w-full resize-y rounded-sm border border-[#9aa0a6] px-2.5 py-2 text-[14px] focus:border-indigo focus:outline-none"
+              className="min-h-16 w-full resize-y rounded-md border border-blush-2 px-2.5 py-2 text-[14px] focus:border-indigo focus:outline-none"
             />
           </>
         )}
