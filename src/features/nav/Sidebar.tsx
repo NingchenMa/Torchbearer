@@ -10,7 +10,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { BotFace } from "@/features/observe/Launcher";
+import { TorchMark } from "@/features/nav/TorchMark";
 import { ROLE_LABEL, canAssign } from "@/lib/roles";
 import { useMe } from "@/lib/useMe";
 
@@ -65,43 +65,45 @@ export default function Sidebar() {
         href={t.href}
         aria-current={on ? "page" : undefined}
         title={t.label}
-        className={`relative flex h-11 items-center gap-3 rounded-sm px-[13px] md:px-3.5 ${on ? "bg-indigo-soft font-medium text-indigo" : "text-[#475467] hover:bg-panel-2 hover:text-[#1f2d3d]"}`}
+        className={`relative flex h-11 items-center gap-3 rounded-md px-[13px] transition-colors md:px-3.5 ${on ? "bg-white/10 font-bold text-white" : "text-blush-2 hover:bg-white/5 hover:text-white"}`}
       >
-        {on && <span className="absolute inset-y-2 left-0 w-[3px] rounded-r bg-indigo" aria-hidden="true" />}
+        {on && <span className="absolute inset-y-2 left-0 w-[3px] rounded-r-full bg-amber shadow-[0_0_10px_rgba(242,160,7,.7)]" aria-hidden="true" />}
         <Icon>{t.icon}</Icon>
         <span className="hidden md:inline">{t.label}</span>
         {t.badge && waiting > 0 && (
-          <b className="ml-auto hidden min-w-[22px] rounded-full border border-[#f0d58a] bg-warn-soft px-[7px] text-center text-[12px] font-medium text-[#7a5a00] md:block">{waiting}</b>
+          <b className="ml-auto hidden min-w-[22px] rounded-full bg-amber px-[7px] text-center text-[12px] font-bold text-maroon-3 md:block">{waiting}</b>
         )}
       </Link>
     );
   };
 
   return (
-    <aside className="flex w-16 shrink-0 flex-col border-r border-line bg-white px-2 pb-4 pt-3 md:w-60 md:px-4 md:pt-4">
-      <Link prefetch={false} href="/vault" aria-label="Torchbearer, workflows" className="flex items-center gap-2.5 px-1 pb-5 md:pb-6">
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] bg-indigo">
-          <BotFace size={22} />
+    <aside className="tb-hero flex w-16 shrink-0 flex-col border-r border-maroon-3 px-2 pb-4 pt-3 md:w-60 md:px-4 md:pt-4">
+      <Link prefetch={false} href="/vault" aria-label="TorchBearer, workflows" className="flex items-center gap-2.5 px-1 pb-5 md:pb-6">
+        <span className="grid h-9 w-9 shrink-0 place-items-center">
+          <TorchMark size={32} />
         </span>
-        <span className="hidden text-[15px] font-medium text-[#1f2d3d] md:block">Torchbearer</span>
+        <span className="hidden leading-tight md:block">
+          <span className="block font-display text-[20px] text-blush">TorchBearer</span>
+          {me && me.org !== "torchbearer" && <span className="block max-w-[150px] truncate font-serif text-[12.5px] italic text-amber">{companyName(me.org)}</span>}
+        </span>
       </Link>
 
-      <div className="mx-2 mb-2 mt-1 hidden text-[11.5px] font-bold uppercase tracking-[.12em] text-[#667085] md:block">Workflows</div>
+      <div className="mx-2 mb-2 mt-1 hidden text-[11.5px] font-bold uppercase tracking-[.16em] text-blush-2/70 md:block">Workflows</div>
       <nav className="flex flex-col gap-1" aria-label="Workflows">{items.map(link)}</nav>
 
-      <div className="mx-2 mb-2 mt-6 hidden text-[11.5px] font-bold uppercase tracking-[.12em] text-[#667085] md:block">Modules</div>
+      <div className="mx-2 mb-2 mt-6 hidden text-[11.5px] font-bold uppercase tracking-[.16em] text-blush-2/70 md:block">Modules</div>
       <nav className="mt-4 flex flex-col gap-1 md:mt-0" aria-label="Modules">
         {link(TRAINING)}
         {me?.role === "admin" && link(ACCESS)}
       </nav>
 
       {me && (
-        <div className="mt-auto hidden rounded-md border border-line bg-panel px-3.5 py-3 text-[13px] md:block">
-          {me.org !== "torchbearer" && <b className="block truncate font-medium text-[#1f2d3d]">{companyName(me.org)}</b>}
-          <div className="truncate text-[#1f2d3d]">{me.name}</div>
-          <div className="truncate text-[#667085]">{me.email}</div>
-          <span className="mt-1 inline-block rounded-full bg-indigo-soft px-2 text-[12px] font-medium text-indigo">{ROLE_LABEL[me.role]}</span>
-          <a href="/api/auth/logout" className="mt-1.5 block text-[#667085] hover:text-indigo">Sign out</a>
+        <div className="mt-auto hidden rounded-md border border-blush-2/15 bg-white/[.04] px-3.5 py-3 text-[13px] md:block">
+          <div className="truncate font-bold text-blush">{me.name}</div>
+          <div className="truncate text-blush-2">{me.email}</div>
+          <span className="mt-1.5 inline-block rounded-full bg-amber/20 px-2.5 text-[12px] font-bold text-amber">{ROLE_LABEL[me.role]}</span>
+          <a href="/api/auth/logout" className="mt-2 block text-blush-2 transition-colors hover:text-amber">Sign out</a>
         </div>
       )}
     </aside>
