@@ -337,6 +337,7 @@ export default function MappingPage() {
       {exporting && (
         <ExportDialog
           map={{ ...map, steps: finalSteps.map((s) => ({ ...s, process: map.steps.find((x) => x.id === s.id)?.process ?? s.process })) }}
+          meta={{ id: wf.id, name: wf.name, createdAt: wf.createdAt, trainedBy: library.find((w) => w.id === wf.id)?.trainedBy }}
           onClose={() => setExporting(false)}
           workflowId={isExample ? undefined : wf.id}
           onBuilt={(next) => setRecord(next)}
