@@ -7,7 +7,7 @@
 //   Torch      the animated torch with a flickering flame and rising embers
 // All motion stops for people who turn on reduced motion (see globals.css).
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 export function Spotlight({ children, className = "", style, as: Tag = "div" }: { children: ReactNode; className?: string; style?: React.CSSProperties; as?: "div" | "li" }) {
   const ref = useRef<HTMLElement>(null);
@@ -76,10 +76,19 @@ export function Segmented<T extends string>({
 }) {
   const wrap = useRef<HTMLDivElement>(null);
   const [pill, setPill] = useState({ left: 0, width: 0 });
-  useLayoutEffect(() => {
+  const measure = useCallback(() => {
     const el = wrap.current?.querySelector<HTMLElement>(`[data-v="${value}"]`);
-    if (el) setPill({ left: el.offsetLeft, width: el.offsetWidth });
-  }, [value, options]);
+    if (el) setPill((p) => (p.left === el.offsetLeft && p.width === el.offsetWidth ? p : { left: el.offsetLeft, width: el.offsetWidth }));
+  }, [value]);
+  useLayoutEffect(measure, [measure, options]);
+  // The buttons change width when the web font arrives or the counts change: measure again then.
+  useEffect(() => {
+    const el = wrap.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [measure]);
   return (
     <div ref={wrap} className="relative flex shrink-0 rounded-full border border-line bg-white p-1" role="group" aria-label={label}>
       <span
