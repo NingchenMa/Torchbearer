@@ -152,5 +152,4 @@ vite.config.ts.timestamp-*
 !.env.example
 .gstack/
 
-# Personal notes and plans (not for the repo)
-docs/temp/
+temp/

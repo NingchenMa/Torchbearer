@@ -1,6 +1,6 @@
 // localStorage persistence for the captured session and the generated Work Map.
 import { sampleWorkMap, capturedSessionEnabled } from "@/data/sampleWorkMap";
-import type { ReviewBatch, ScreenEvent, StepMastery, TranscriptLine, WorkMap, WorkflowRecord, WorkflowSummary } from "./types";
+import type { ReviewBatch, ReviewItem, ScreenEvent, StepMastery, TranscriptLine, WorkMap, WorkflowRecord, WorkflowSummary } from "./types";
 export type { ReviewBatch } from "./types";
 
 const SESSION_KEY = "apprentice.session";
@@ -102,15 +102,20 @@ export async function listWorkflows(): Promise<WorkflowSummary[]> {
   }
 }
 
-export async function getWorkflow(id: string | null | undefined): Promise<WorkflowRecord | null> {
-  if (!id) return null;
-  if (id === EXAMPLE_ID) return exampleWorkflow();
+/** A workflow, and whether the server refused it because the signed-in person may not open it (403). */
+export async function getWorkflowAccess(id: string | null | undefined): Promise<{ record: WorkflowRecord | null; denied: boolean }> {
+  if (!id) return { record: null, denied: false };
+  if (id === EXAMPLE_ID) return { record: exampleWorkflow(), denied: false };
   try {
     const r = await fetch(`/api/workflows/${encodeURIComponent(id)}`, { cache: "no-store" });
-    return r.ok ? await r.json() : null;
+    return { record: r.ok ? await r.json() : null, denied: r.status === 403 };
   } catch {
-    return null;
+    return { record: null, denied: false };
   }
+}
+
+export async function getWorkflow(id: string | null | undefined): Promise<WorkflowRecord | null> {
+  return (await getWorkflowAccess(id)).record;
 }
 
 export async function saveWorkflow(record: WorkflowRecord): Promise<boolean> {
@@ -123,39 +128,79 @@ export async function saveWorkflow(record: WorkflowRecord): Promise<boolean> {
   }
 }
 
-const progressUrl = (workflowId: string, learner: string) =>
-  `/api/progress?workflow=${encodeURIComponent(workflowId)}&learner=${encodeURIComponent(learner)}`;
+// Progress belongs to the signed-in person; the server knows who that is.
+const progressUrl = (workflowId: string) => `/api/progress?workflow=${encodeURIComponent(workflowId)}`;
 
-export async function loadMastery(workflowId: string, learner: string): Promise<Record<string, StepMastery>> {
+export async function loadMastery(workflowId: string): Promise<Record<string, StepMastery>> {
   try {
-    const r = await fetch(progressUrl(workflowId, learner), { cache: "no-store" });
+    const r = await fetch(progressUrl(workflowId), { cache: "no-store" });
     return r.ok ? await r.json() : {};
   } catch {
     return {};
   }
 }
 
-export async function saveMastery(workflowId: string, learner: string, patch: Record<string, StepMastery>) {
+export async function saveMastery(workflowId: string, patch: Record<string, StepMastery>) {
   try {
-    await fetch(progressUrl(workflowId, learner), { method: "PUT", headers: json, body: JSON.stringify(patch) });
+    await fetch(progressUrl(workflowId), { method: "PUT", headers: json, body: JSON.stringify(patch) });
   } catch {
     /* best effort */
   }
 }
 
-export async function loadReviews(): Promise<ReviewBatch | null> {
+/** A workflow the signed-in person was assigned, to practise on (managers and recorders use getWorkflow). */
+export async function getTrainingWorkflow(id: string | null | undefined): Promise<{ record: WorkflowRecord | null; denied: boolean }> {
+  if (!id) return { record: null, denied: false };
   try {
-    const r = await fetch("/api/reviews", { cache: "no-store" });
+    const r = await fetch(`/api/workflows/${encodeURIComponent(id)}/train`, { cache: "no-store" });
+    return { record: r.ok ? await r.json() : null, denied: r.status === 403 };
+  } catch {
+    return { record: null, denied: false };
+  }
+}
+
+/** Training: this person's own review items for a workflow, so earlier sessions' unreviewed ones are kept. */
+export async function loadMyReviews(workflowId: string): Promise<ReviewBatch | null> {
+  try {
+    const r = await fetch(`/api/reviews?mine=1&workflow=${encodeURIComponent(workflowId)}`, { cache: "no-store" });
     return r.ok ? await r.json() : null;
   } catch {
     return null;
   }
 }
 
-export async function saveReviews(batch: ReviewBatch) {
+export async function saveMyReviews(workflowId: string, items: ReviewItem[]) {
   try {
-    await fetch("/api/reviews", { method: "PUT", headers: json, body: JSON.stringify(batch) });
+    await fetch("/api/reviews", { method: "POST", headers: json, body: JSON.stringify({ workflowId, items }) });
   } catch {
     /* best effort */
+  }
+}
+
+/** Reviews: the batches the signed-in person may review. */
+export async function loadReviewBatches(): Promise<ReviewBatch[]> {
+  try {
+    const r = await fetch("/api/reviews", { cache: "no-store" });
+    return r.ok ? await r.json() : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveReviewDecisions(batch: ReviewBatch, submitted = false): Promise<boolean> {
+  try {
+    const r = await fetch("/api/reviews", {
+      method: "PUT",
+      headers: json,
+      body: JSON.stringify({
+        workflowId: batch.workflowId,
+        learnerId: batch.learnerId,
+        decisions: batch.items.map((i) => ({ id: i.id, decision: i.decision, comment: i.comment })),
+        submitted,
+      }),
+    });
+    return r.ok;
+  } catch {
+    return false;
   }
 }

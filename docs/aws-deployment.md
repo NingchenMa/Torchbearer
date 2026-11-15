@@ -72,6 +72,46 @@ AWS Amplify Hosting ── Next.js pages + API routes (server code)
 
 **Turned down:** the Amplify site password alone (one shared password, no per-company data); Amplify's own auth library (client-side tokens, more code in the browser).
 
+### D3b. Roles: Cognito groups (admin, manager, employee)
+**Chosen:** a person's role is their Cognito **group**: `admin`, `manager`, or no group (= employee). Cognito puts the groups in the ID token (`cognito:groups`), so `userFromToken` reads the role with no extra call and no new permission. The rules live in `src/lib/roles.ts` and every API route enforces them; the pages only use the role to decide what to show.
+
+| Role | Sees | Can do |
+|---|---|---|
+| Admin | everything a manager sees, plus the people list | everything a manager can do, plus **Access management**: change anyone's access and add new members |
+| Manager | every workflow, review and assignment in their company | open, edit, approve and delete any workflow; review any practice session; assign workflows to employees |
+| Employee | only the workflows they recorded, and the work assigned to them | open and approve their own workflows; review practice sessions on them; train on what is assigned to them |
+
+A workflow's owner is the recorder's Cognito user ID (`ownerId`), never their display name. Workflows saved before owners existed have none, so only a manager or admin can open them.
+
+**One-time setup:** create the two groups, then invite people with a role (the script adds them to the group).
+
+```bash
+aws cognito-idp create-group --region us-east-1 --user-pool-id us-east-1_YyfcIjRiS --group-name manager
+aws cognito-idp create-group --region us-east-1 --user-pool-id us-east-1_YyfcIjRiS --group-name admin
+scripts/invite-user.sh <email> "<Full Name>" <company-id> manager
+```
+
+**Access management (admins only):** the sidebar's Access management page changes people's access and adds new members (full name, work email and employee ID are required). The server does this through the Cognito admin API (`src/lib/cognitoAdmin.ts`): changing access moves the person between the `manager` and `admin` groups; adding someone calls `AdminCreateUser`, which emails them a temporary password, always in the admin's own company. An admin cannot remove their own admin access, so at least one admin always remains. A change applies the next time the person's sign-in token is renewed (within an hour). The first admin is made once from the command line: `scripts/invite-user.sh <email> "<Full Name>" <company-id> admin`.
+
+**Extra permission the app's IAM role needs** (the branch role `torchbearer-amplify-compute`, in addition to S3), limited to this one user pool:
+
+```json
+{
+  "Effect": "Allow",
+  "Action": [
+    "cognito-idp:AdminCreateUser",
+    "cognito-idp:AdminGetUser",
+    "cognito-idp:AdminAddUserToGroup",
+    "cognito-idp:AdminRemoveUserFromGroup"
+  ],
+  "Resource": "arn:aws:cognito-idp:us-east-1:744438387719:userpool/us-east-1_YyfcIjRiS"
+}
+```
+
+Without it, Access management shows an error and nothing else in the app is affected. To change a role by hand instead: `aws cognito-idp admin-add-user-to-group` or `admin-remove-user-from-group`.
+
+**Company directory:** Cognito cannot list people by company, so people are written to `orgs/<company>/members/index.json` (`src/lib/members.ts`): when an admin adds them, and when they sign in. Managers pick people from it on the Assign page; admins manage it on Access management. People who signed in before employee IDs existed have none.
+
 ### D4. Secrets: Amplify environment variables
 API keys are set on the Amplify branch and written to `.env.production` during the build (`amplify.yml`), which is how Amplify makes them visible to server routes. They never reach the browser. Move to AWS Secrets Manager when there is more than one environment or more people with console access.
 
