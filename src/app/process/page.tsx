@@ -76,7 +76,6 @@ export default function ProcessMapPage() {
   const [building, setBuilding] = useState(false);
   const [zoom, setZoom] = useState<{ src: string; title: string } | null>(null);
   const [me, setMe] = useState<string | undefined>(undefined);
-  const [openStep, setOpenStep] = useState<string | null>(null); // the step whose details are open in a popup
   const [groupBy, setGroupBy] = useState<"tool" | "action">("tool");
   useEffect(() => {
     fetch("/api/auth/me")
@@ -249,7 +248,6 @@ export default function ProcessMapPage() {
           map={byAction ? { ...record.map, layout: record.map.layoutByAction } : record.map}
           onSave={!CANVAS_EDITING || record.id === EXAMPLE_ID ? undefined : byAction ? saveActionCanvas : saveCanvas}
           me={me}
-          onOpenStep={setOpenStep}
           tools={built ? tools : []}
           lanes={byAction ? actionLanes : built && tools.length ? tools : ["All steps"]}
           laneOf={(s) => (byAction ? actionLanes.indexOf(actionOf(s)) : built && tools.length ? Math.max(0, tools.indexOf(s.process?.tool ?? "")) : 0)}
@@ -258,24 +256,16 @@ export default function ProcessMapPage() {
         />
       </div>
 
-      {/* The page shows the map only. A click on a step opens its details here. */}
-      {openStep && (
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Step details"
-        className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-[rgba(20,28,38,.55)] p-4 sm:p-8"
-        onClick={() => setOpenStep(null)}
-      >
-        <div className="w-full max-w-3xl" onClick={(e) => e.stopPropagation()}>
-        <div className="mb-2 flex justify-end">
-          <button onClick={() => setOpenStep(null)} className="h-9 rounded-full bg-white px-4 text-[14px] font-bold text-[#344054] shadow hover:text-indigo">Close ✕</button>
-        </div>
+      <div className="mx-auto max-w-6xl px-4 pb-6 sm:px-6">
+
+        {/* The flow, step by step */}
+        <h2 className="mb-3 text-[13px] font-bold uppercase tracking-[.12em] text-[#667085]">Step details</h2>
         <ol className="flex flex-col">
-          {timed.filter((t) => t.step.id === openStep).map(({ step: s, index, duration }) => {
+          {timed.map(({ step: s, index, duration }) => {
             const p = s.process;
             return (
               <li key={s.id} className="relative pb-5 pl-10">
+                {index < timed.length - 1 && <span className="absolute bottom-0 left-[13px] top-8 w-[2px] bg-[#d0d5dd]" aria-hidden="true" />}
                 <span
                   className="absolute left-0 top-1 grid h-7 w-7 place-items-center rounded-full text-[13px] font-bold text-white"
                   style={{ background: p ? color(p.tool) : "#5146d9" }}
@@ -334,9 +324,9 @@ export default function ProcessMapPage() {
                           <li className="mt-1 text-[#667085]">
                             → used in{" "}
                             {p.feedsInto.map((id, k) => (
-                              <button key={id} onClick={() => setOpenStep(id)} className="text-indigo hover:underline">
+                              <a key={id} href={`#step-${id}`} className="text-indigo hover:underline">
                                 {k ? ", " : ""}step {order.get(id)}
-                              </button>
+                              </a>
                             ))}
                           </li>
                         )}
@@ -377,9 +367,10 @@ export default function ProcessMapPage() {
             );
           })}
         </ol>
-        </div>
+
+        {/* Data lineage: each piece of data, where it's made and where it's used */}
+        {built && <DataFlow steps={steps} order={order} />}
       </div>
-      )}
 
       {/* A step's screenshot, full size */}
       {zoom && (
@@ -419,5 +410,36 @@ function Block({ title, children }: { title: string; children: React.ReactNode }
       <div className="text-[12px] font-bold uppercase tracking-wide text-[#667085]">{title}</div>
       <ul className="mt-1 space-y-0.5 text-[#344054]">{children}</ul>
     </div>
+  );
+}
+
+function DataFlow({ steps, order }: { steps: WorkMapStep[]; order: Map<string, number> }) {
+  // Each input row: the data, where it comes from, and the step that uses it.
+  const rows = steps.flatMap((s) => (s.process?.inputs ?? []).map((x) => ({ name: x.name, source: x.source, usedIn: order.get(s.id) ?? 0 })));
+  if (!rows.length) return null;
+  return (
+    <>
+      <h2 className="mb-3 mt-4 text-[13px] font-bold uppercase tracking-[.12em] text-[#667085]">Data flow</h2>
+      <div className="overflow-x-auto rounded-md border border-line bg-white">
+        <table className="w-full min-w-[480px] text-left text-[14px]">
+          <thead className="bg-[#f9fafb] text-[12px] uppercase tracking-wide text-[#667085]">
+            <tr>
+              <th className="px-4 py-2 font-bold">Data or document</th>
+              <th className="px-4 py-2 font-bold">Comes from</th>
+              <th className="px-4 py-2 font-bold">Used in</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i} className="border-t border-line">
+                <td className="px-4 py-2 text-[#1f2d3d]">{r.name}</td>
+                <td className={`px-4 py-2 ${r.source === "unknown" ? "text-[#b25e09]" : "text-[#475467]"}`}>{r.source}</td>
+                <td className="px-4 py-2 text-[#475467]">step {r.usedIn}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
