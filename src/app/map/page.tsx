@@ -71,6 +71,15 @@ export default function MappingPage() {
   const [editing, setEditing] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [zoom, setZoom] = useState<WorkMapStep | null>(null);
+  const [noteOpen, setNoteOpen] = useState<string | null>(null); // the step whose note box is open (check view)
+  const [confirmDel, setConfirmDel] = useState<string | null>(null); // the step waiting for a second click on Delete
+  const [me, setMe] = useState("");
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((m) => m?.email && setMe(m.email))
+      .catch(() => {});
+  }, []);
 
   const approved = !!map.published;
   const checked = map.steps.filter((s) => s.review).length;
@@ -110,8 +119,49 @@ export default function MappingPage() {
   function editStep(id: string, patch: Partial<WorkMapStep>) {
     setDraft(finalSteps.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   }
+  /** Change the list of steps (add, delete, reorder, note): on the draft in the corrected view, straight to the database while checking. */
+  function mutate(change: (steps: WorkMapStep[]) => WorkMapStep[]) {
+    if (showFinal) setDraft(change(finalSteps));
+    else persist({ ...wf, map: { ...map, published: false, steps: change(map.steps).map((s, i) => ({ ...s, order: i + 1 })) } });
+  }
+  function addStep() {
+    const taken = new Set([...map.steps, ...finalSteps].map((s) => s.id));
+    let n = taken.size + 1;
+    while (taken.has(`m${n}`)) n++;
+    const id = `m${n}`;
+    // A step added by hand has no recording, so there is no observation to check.
+    const step: WorkMapStep = { id, order: 0, title: "", time: "", decision: "", reason: "", expertQuote: "", guardrails: [], review: "ok", addedBy: me };
+    mutate((steps) => [...steps, step]);
+    if (showFinal) setEditing(id);
+  }
+  function removeStep(id: string) {
+    if (confirmDel !== id) return setConfirmDel(id);
+    setConfirmDel(null);
+    mutate((steps) => steps.filter((s) => s.id !== id));
+  }
+  function moveStep(id: string, by: -1 | 1) {
+    mutate((steps) => {
+      const i = steps.findIndex((s) => s.id === id);
+      const j = i + by;
+      if (i < 0 || j < 0 || j >= steps.length) return steps;
+      const next = [...steps];
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
+  }
+  const patchStep = (id: string, patch: Partial<WorkMapStep>) => mutate((steps) => steps.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+  /** Move up, move down and delete, shown on every step in both views. */
+  const stepTools = (s: WorkMapStep, i: number, count: number) => (
+    <span className="ml-auto flex items-center gap-1">
+      <button onClick={() => moveStep(s.id, -1)} disabled={i === 0} className="h-8 w-8 rounded-sm border border-line bg-white text-[14px] text-[#475467] hover:border-indigo hover:text-indigo disabled:opacity-30" aria-label={`Move step ${i + 1} up`} title="Move up">↑</button>
+      <button onClick={() => moveStep(s.id, 1)} disabled={i === count - 1} className="h-8 w-8 rounded-sm border border-line bg-white text-[14px] text-[#475467] hover:border-indigo hover:text-indigo disabled:opacity-30" aria-label={`Move step ${i + 1} down`} title="Move down">↓</button>
+      <button onClick={() => removeStep(s.id)} onBlur={() => setConfirmDel(null)} className={`h-8 rounded-sm border px-2.5 text-[13px] ${confirmDel === s.id ? "border-err bg-err text-white" : "border-line bg-white text-err hover:border-err"}`}>
+        {confirmDel === s.id ? "Click again to delete" : "Delete"}
+      </button>
+    </span>
+  );
   function save() {
-    const steps = finalSteps.map((s, i) => ({ ...s, order: i + 1, review: "ok" as const, correction: undefined }));
+    const steps = finalSteps.filter((s) => s.title.trim()).map((s, i) => ({ ...s, order: i + 1, review: "ok" as const, correction: undefined }));
     persist({ ...wf, map: { ...map, steps, published: true, confirmed: true } }, true);
     setDraft(null);
     setEditing(null);
@@ -169,11 +219,11 @@ export default function MappingPage() {
               <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded-sm border border-indigo/30 bg-indigo-soft px-2.5 py-1 text-[12px] font-bold uppercase tracking-wide text-indigo">Module 2 · Mapping</span>
                 <span className={`rounded-full px-2.5 py-1 text-[12.5px] font-medium ${approved ? "bg-ok-soft text-ok" : "bg-warn-soft text-[#7a5a00]"}`}>
-                  {approved ? "● Saved · Torchbearer trained, all set" : "● On hold · waiting for the expert's approval"}
+                  {approved ? "● Workflow saved" : "● Needs approval"}
                 </span>
                 {!isExample && (
                   <span className={`text-[12.5px] ${saveState === "error" ? "text-err" : "text-[#667085]"}`}>
-                    {saveState === "saving" ? "Saving to the database…" : saveState === "error" ? "Couldn't save to the database, retrying on your next change" : "✓ Saved in the database"}
+                    {saveState === "saving" ? "Saving to the database…" : saveState === "error" ? "Couldn't save to the database, retrying on your next change" : "✓ Workflow saved"}
                   </span>
                 )}
               </div>
@@ -220,7 +270,7 @@ export default function MappingPage() {
         {!showFinal ? (
           <>
             <ol className="flex flex-col gap-4">
-              {map.steps.map((s) => (
+              {map.steps.map((s, i) => (
                 <li key={s.id} className="rise overflow-hidden rounded-md border border-line bg-white shadow-[0_1px_2px_rgba(16,24,40,.04),0_8px_24px_rgba(16,24,40,.05)]">
                   <div className="grid md:grid-cols-[260px_minmax(0,1fr)]">
                     <button className="relative block bg-[#eef2f6] md:border-r md:border-line" onClick={() => s.screenshot && setZoom(s)} disabled={!s.screenshot}>
@@ -228,15 +278,25 @@ export default function MappingPage() {
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={s.screenshot} alt={`Screen at ${s.time}`} className="h-full max-h-56 w-full object-cover object-top" />
                       ) : (
-                        <div className="grid h-full min-h-32 place-items-center bg-[linear-gradient(135deg,#2F74D0,#5146d9)] p-4 text-center text-[13px] text-white">Screen at {s.time}</div>
+                        <div className="grid h-full min-h-32 place-items-center bg-[linear-gradient(135deg,#2F74D0,#5146d9)] p-4 text-center text-[13px] text-white">{s.addedBy !== undefined ? "Added by hand · no recording" : `Screen at ${s.time}`}</div>
                       )}
-                      <span className="absolute left-2 top-2 rounded-sm bg-black/60 px-1.5 py-0.5 font-mono text-[11px] text-white">{s.time}</span>
+                      {s.time && <span className="absolute left-2 top-2 rounded-sm bg-black/60 px-1.5 py-0.5 font-mono text-[11px] text-white">{s.time}</span>}
                     </button>
                     <div className="p-5">
                       <div className="flex items-start gap-3">
                         <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-brand text-[13px] font-bold text-white">{s.order}</span>
                         <div className="min-w-0 flex-1">
-                          <div className="text-[18px] leading-snug text-[#1f2d3d]">{s.title}</div>
+                          {s.addedBy !== undefined ? (
+                            <input
+                              value={s.title}
+                              onChange={(e) => patchStep(s.id, { title: e.target.value })}
+                              placeholder="What happens in this step?"
+                              aria-label={`Step ${s.order}`}
+                              className="h-10 w-full rounded-sm border border-[#9aa0a6] px-3 text-[16px] focus:border-indigo focus:outline-none"
+                            />
+                          ) : (
+                            <div className="text-[18px] leading-snug text-[#1f2d3d]">{s.title}</div>
+                          )}
                           {s.decision && <div className="mt-0.5 text-[14px] text-[#667085]">Torchbearer saw: {s.decision}</div>}
                         </div>
                       </div>
@@ -247,10 +307,29 @@ export default function MappingPage() {
                         <div key={g} className="mt-2 flex items-start gap-2 text-[14px]"><TypeChip type={guardrailType(g)} /> {g}</div>
                       ))}
                       <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-3">
+                        {s.addedBy === undefined && (
+                          <>
                         <span className="mr-1 text-[13px] text-[#667085]">Is this observation right?</span>
                         <button onClick={() => review(s.id, "ok")} className={`h-9 rounded-sm border px-3 text-[14px] ${s.review === "ok" ? "border-ok bg-ok text-white" : "border-ok bg-white text-ok hover:bg-ok-soft"}`}>✓ Correct</button>
                         <button onClick={() => review(s.id, "wrong")} className={`h-9 rounded-sm border px-3 text-[14px] ${s.review === "wrong" ? "border-err bg-err text-white" : "border-err bg-white text-err hover:bg-err-soft"}`}>✗ Wrong</button>
+                          </>
+                        )}
+                        <button onClick={() => setNoteOpen(noteOpen === s.id ? null : s.id)} className="h-9 rounded-sm border border-line bg-white px-3 text-[14px] text-[#475467] hover:border-indigo hover:text-indigo">
+                          {s.note?.trim() ? "Edit note" : "+ Add note"}
+                        </button>
+                        {!isExample && stepTools(s, i, map.steps.length)}
                       </div>
+                      {noteOpen === s.id ? (
+                        <textarea
+                          value={s.note ?? ""}
+                          onChange={(e) => patchStep(s.id, { note: e.target.value })}
+                          placeholder="A note for whoever reads or learns this step."
+                          aria-label={`Note on step ${s.order}`}
+                          className="mt-2 h-20 w-full rounded-sm border border-[#9aa0a6] bg-[#fffbea] p-2 text-[14.5px] focus:border-indigo focus:outline-none"
+                        />
+                      ) : (
+                        s.note?.trim() && <p className="mt-2 rounded-md bg-[#fff1c2] px-3 py-2 text-[14px] text-[#3d2f00]"><b className="text-[#6b5000]">Note:</b> {s.note}</p>
+                      )}
                       {s.review === "wrong" && (
                         <textarea
                           value={s.correction ?? ""}
@@ -269,7 +348,12 @@ export default function MappingPage() {
                 <b>Off the record</b> {r.from}–{r.to}: The expert paused the recording here. Nothing was saved.
               </p>
             ))}
-            <div className="mt-6 flex items-center justify-end gap-3">
+            <div className="mt-6 flex flex-wrap items-center justify-end gap-3">
+              {!isExample && (
+                <button className="mr-auto h-11 rounded-sm border border-dashed border-indigo bg-white px-5 text-[15px] text-indigo hover:bg-indigo-soft" onClick={addStep}>
+                  + Add step
+                </button>
+              )}
               <span className="text-[14px] text-[#667085]">{allChecked ? "All steps checked." : `${map.steps.length - checked} step(s) left to check.`}</span>
               <button className="h-11 rounded-sm bg-indigo px-5 text-[15px] text-white hover:bg-indigo-dark disabled:opacity-40" onClick={toFinal} disabled={!allChecked}>
                 Continue → see the corrected workflow
@@ -294,6 +378,7 @@ export default function MappingPage() {
                             <Field label="Step" value={s.title} onChange={(v) => editStep(s.id, { title: v })} />
                             <Field label="Why (in the expert's words)" value={s.expertQuote} onChange={(v) => editStep(s.id, { expertQuote: v, reason: v })} />
                             <Field label="Rule (limit, exception or when to stop)" value={s.guardrails[0] ?? ""} onChange={(v) => editStep(s.id, { guardrails: v.trim() ? [v] : [] })} />
+                            <Field label="Note" value={s.note ?? ""} onChange={(v) => editStep(s.id, { note: v })} />
                           </div>
                         ) : (
                           <>
@@ -303,6 +388,7 @@ export default function MappingPage() {
                             {s.guardrails.map((g) => (
                               <div key={g} className="mt-1.5 flex items-start gap-2 text-[14px]"><TypeChip type={guardrailType(g)} /> {g}</div>
                             ))}
+                            {s.note?.trim() && <div className="mt-2 rounded-md bg-[#fff1c2] px-3 py-2 text-[14px] text-[#3d2f00]"><b className="text-[#6b5000]">Note:</b> {s.note}</div>}
                           </>
                         )}
                       </div>
@@ -318,12 +404,16 @@ export default function MappingPage() {
                         </button>
                       )}
                     </div>
+                    {!isExample && <div className="mt-3 flex border-t border-line pt-3">{stepTools(s, i, finalSteps.length)}</div>}
                   </li>
                 );
               })}
             </ol>
             {!isExample && (
               <div className="mt-6 flex flex-wrap items-center justify-end gap-3">
+                <button className="mr-auto h-11 rounded-sm border border-dashed border-indigo bg-white px-5 text-[15px] text-indigo hover:bg-indigo-soft" onClick={addStep}>
+                  + Add step
+                </button>
                 <button className="h-11 rounded-sm border border-indigo bg-white px-5 text-[15px] text-indigo hover:bg-indigo-soft" onClick={revise}>
                   ← Revise
                 </button>

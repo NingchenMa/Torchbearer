@@ -30,11 +30,12 @@ For EVERY step return:
 - outputs: what the step produces or changes (a saved form, an attached document, an approval, a status).
 - feedsInto: ids of LATER steps that use this step's outputs. [] if none.
 - decision: the judgment call made in this step and the reason, from the expert's reason/rules. "" for routine steps. Never invent a reason.
+- summary: one or two plain sentences that sum up what the expert explained about this step: what they do and why, in the third person ("The expert checks the total against the receipt because…"). Build it from the expert's reason, rules and answers. Never a question and answer list, never invented. "" if the expert explained nothing about this step.
 - unknown: short questions to the expert, one per unclear point (always one for an input whose source is unknown), about what the recording can't tell (where an input comes from, who receives the output, a missing reason). [] if nothing important is unclear.
 
 Expert answers: when a step lists "expert answered", use those answers (for example as an input's source or the decision's reason) and never ask that question again.
 Rules: a step only "feedsInto" a later step when that later step actually uses something it produced. Stay generic about the case (no people's names, no amounts or ids unless they are a rule). Never invent tools, people or systems you can't see or read. Keep every string short.
-Return JSON only: {"steps":[{"id": string, "tool": string, "action": string, "inputs":[{"name": string, "source": string}], "outputs":[string], "feedsInto":[string], "decision": string, "unknown":[string]}]}`;
+Return JSON only: {"steps":[{"id": string, "tool": string, "action": string, "inputs":[{"name": string, "source": string}], "outputs":[string], "feedsInto":[string], "decision": string, "summary": string, "unknown":[string]}]}`;
 
 const toPart = (dataUrl: string) => ({ inlineData: { mimeType: "image/jpeg", data: dataUrl.replace(/^data:image\/\w+;base64,/, "") } });
 
@@ -106,6 +107,7 @@ export async function POST(req: Request) {
             feedsInto: strs(p.feedsInto).filter((x) => ids.has(x) && later.has(x)),
             decision: stepRefs(str(p.decision)),
             unknown,
+            ...(str(p.summary) ? { summary: str(p.summary) } : {}),
           },
         };
       }),

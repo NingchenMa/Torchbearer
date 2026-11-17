@@ -10,7 +10,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import NoAccess from "@/features/nav/NoAccess";
 import { EXAMPLE_ID, getWorkflowAccess, listWorkflows, saveWorkflow } from "@/lib/session";
-import type { StepAnswer, WorkflowRecord, WorkflowSummary, WorkMap, WorkMapStep } from "@/lib/types";
+import type { WorkflowRecord, WorkflowSummary, WorkMap, WorkMapStep } from "@/lib/types";
 import { ProcessCanvas } from "@/features/workmap/ProcessCanvas";
 import { ACTION_NAMES, OTHER_ACTION, actionColor, actionOf } from "@/features/workmap/actionCategory";
 import { Segmented } from "@/features/ui/fx";
@@ -63,6 +63,10 @@ function timeSteps(steps: WorkMapStep[]): Timed[] {
 // A small fixed palette for tools (works on light backgrounds).
 const TOOL_COLORS = ["#a4161a", "#b8650a", "#0f766e", "#5a1220", "#2f5d8a", "#6b4e3d"]; // the website palette: crimson, amber, teal, maroon, slate, umber
 
+// The process map is view-only: steps are added, removed, reordered and annotated on the Work Map (/map).
+// Set to true to bring back editing on the canvas.
+const CANVAS_EDITING: boolean = false;
+
 export default function ProcessMapPage() {
   const idParam = useSyncExternalStore(() => () => {}, readId, () => null);
   const [library, setLibrary] = useState<WorkflowSummary[]>([]);
@@ -72,6 +76,7 @@ export default function ProcessMapPage() {
   const [building, setBuilding] = useState(false);
   const [zoom, setZoom] = useState<{ src: string; title: string } | null>(null);
   const [me, setMe] = useState<string | undefined>(undefined);
+  const [openStep, setOpenStep] = useState<string | null>(null); // the step whose details are open in a popup
   const [groupBy, setGroupBy] = useState<"tool" | "action">("tool");
   useEffect(() => {
     fetch("/api/auth/me")
@@ -97,25 +102,6 @@ export default function ProcessMapPage() {
       live = false;
     };
   }, [idParam]);
-
-  /** Save the expert's answer to one of a step's open questions (replaces an earlier answer to it). */
-  async function answer(stepId: string, q: string, a: string) {
-    if (!record) return false;
-    const me = await fetch("/api/auth/me").then((r) => (r.ok ? r.json() : null)).catch(() => null);
-    const entry: StepAnswer = { q, a: a.trim(), by: me?.email ?? "", at: new Date().toISOString() };
-    const next: WorkflowRecord = {
-      ...record,
-      map: {
-        ...record.map,
-        steps: record.map.steps.map((s) =>
-          s.id !== stepId ? s : { ...s, answers: [...(s.answers ?? []).filter((x) => x.q !== q), ...(entry.a ? [entry] : [])] },
-        ),
-      },
-    };
-    const ok = await saveWorkflow(next);
-    if (ok) setRecord(next);
-    return ok;
-  }
 
   /** Save what was changed on the process canvas: positions, arrows, notes, data links or a new step order. */
   // Saves can follow each other quickly (a drag, then a new arrow), so build on the latest record.
@@ -195,7 +181,7 @@ export default function ProcessMapPage() {
         <div className="mx-auto max-w-6xl px-4 pb-7 pt-5 sm:px-6">
           <div className="mb-4 flex flex-wrap items-center gap-3 text-[13.5px]">
             <Link href="/vault" className="text-[#667085] hover:text-indigo">← Workflows</Link>
-            <Link href={`/map?id=${encodeURIComponent(record.id)}`} className="text-[#667085] hover:text-indigo">Work Map</Link>
+            {!record.map.published && <Link href={`/map?id=${encodeURIComponent(record.id)}`} className="text-[#667085] hover:text-indigo">Work Map</Link>}
             <select
               value={record.id}
               onChange={(e) => (window.location.search = `?id=${e.target.value}`)}
@@ -261,8 +247,9 @@ export default function ProcessMapPage() {
           key={groupBy}
           timed={timed}
           map={byAction ? { ...record.map, layout: record.map.layoutByAction } : record.map}
-          onSave={record.id === EXAMPLE_ID ? undefined : byAction ? saveActionCanvas : saveCanvas}
+          onSave={!CANVAS_EDITING || record.id === EXAMPLE_ID ? undefined : byAction ? saveActionCanvas : saveCanvas}
           me={me}
+          onOpenStep={setOpenStep}
           tools={built ? tools : []}
           lanes={byAction ? actionLanes : built && tools.length ? tools : ["All steps"]}
           laneOf={(s) => (byAction ? actionLanes.indexOf(actionOf(s)) : built && tools.length ? Math.max(0, tools.indexOf(s.process?.tool ?? "")) : 0)}
@@ -271,16 +258,24 @@ export default function ProcessMapPage() {
         />
       </div>
 
-      <div className="mx-auto max-w-6xl px-4 pb-6 sm:px-6">
-
-        {/* The flow, step by step */}
-        <h2 className="mb-3 text-[13px] font-bold uppercase tracking-[.12em] text-[#667085]">Step details</h2>
+      {/* The page shows the map only. A click on a step opens its details here. */}
+      {openStep && (
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Step details"
+        className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-[rgba(20,28,38,.55)] p-4 sm:p-8"
+        onClick={() => setOpenStep(null)}
+      >
+        <div className="w-full max-w-3xl" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-2 flex justify-end">
+          <button onClick={() => setOpenStep(null)} className="h-9 rounded-full bg-white px-4 text-[14px] font-bold text-[#344054] shadow hover:text-indigo">Close ✕</button>
+        </div>
         <ol className="flex flex-col">
-          {timed.map(({ step: s, index, duration }) => {
+          {timed.filter((t) => t.step.id === openStep).map(({ step: s, index, duration }) => {
             const p = s.process;
             return (
               <li key={s.id} className="relative pb-5 pl-10">
-                {index < timed.length - 1 && <span className="absolute bottom-0 left-[13px] top-8 w-[2px] bg-[#d0d5dd]" aria-hidden="true" />}
                 <span
                   className="absolute left-0 top-1 grid h-7 w-7 place-items-center rounded-full text-[13px] font-bold text-white"
                   style={{ background: p ? color(p.tool) : "#5146d9" }}
@@ -320,9 +315,6 @@ export default function ProcessMapPage() {
                       <b className="text-[#1f2d3d]">Why:</b> {s.reason}
                     </p>
                   )}
-                  {!s.reason && !s.expertQuote && !p?.decision && (
-                    <p className="mt-1.5 text-[13.5px] text-[#98a2b3]">No reason recorded: the expert wasn&apos;t asked about this step.</p>
-                  )}
                   {p ? (
                     <div className="mt-3 grid gap-3 text-[14px] sm:grid-cols-2">
                       <Block title="Needs">
@@ -342,9 +334,9 @@ export default function ProcessMapPage() {
                           <li className="mt-1 text-[#667085]">
                             → used in{" "}
                             {p.feedsInto.map((id, k) => (
-                              <a key={id} href={`#step-${id}`} className="text-indigo hover:underline">
+                              <button key={id} onClick={() => setOpenStep(id)} className="text-indigo hover:underline">
                                 {k ? ", " : ""}step {order.get(id)}
-                              </a>
+                              </button>
                             ))}
                           </li>
                         )}
@@ -370,18 +362,24 @@ export default function ProcessMapPage() {
                   {s.guardrails.map((g) => (
                     <div key={g} className="mt-2 text-[14px] text-[#344054]"><b>Rule:</b> {g}</div>
                   ))}
-                  {((p?.unknown.length ?? 0) > 0 || (s.answers?.length ?? 0) > 0) && (
-                    <ExpertQuestions step={s} canEdit={record.id !== EXAMPLE_ID} onAnswer={(q, a) => answer(s.id, q, a)} />
+                  {s.note?.trim() && (
+                    <div className="mt-3 rounded-md bg-[#fff1c2] px-3 py-2 text-[14px] text-[#3d2f00]">
+                      <b className="text-[#6b5000]">Note:</b> {s.note}
+                    </div>
+                  )}
+                  {p?.summary && (
+                    <div className="mt-3 rounded-md bg-cream px-3 py-2 text-[14.5px] leading-relaxed text-[#344054]">
+                      <b className="text-crimson">The expert&apos;s explanation:</b> {p.summary}
+                    </div>
                   )}
                 </div>
               </li>
             );
           })}
         </ol>
-
-        {/* Data lineage: each piece of data, where it's made and where it's used */}
-        {built && <DataFlow steps={steps} order={order} />}
+        </div>
       </div>
+      )}
 
       {/* A step's screenshot, full size */}
       {zoom && (
@@ -415,106 +413,11 @@ function openQuestions(s: WorkMapStep): string[] {
   return (s.process?.unknown ?? []).filter((q) => !answered.has(q));
 }
 
-/** "Ask the expert": each question with the expert's answer, or a box to add one. */
-function ExpertQuestions({ step, canEdit, onAnswer }: { step: WorkMapStep; canEdit: boolean; onAnswer: (q: string, a: string) => Promise<boolean> }) {
-  // Open questions plus every answered one: a rebuild drops answered questions from the list, the answers stay.
-  const qs = [...new Set([...(step.process?.unknown ?? []), ...(step.answers ?? []).map((x) => x.q)])];
-  const open = openQuestions(step).length;
-  return (
-    <div className={`mt-3 rounded-md border px-3 py-2.5 text-[13.5px] ${open ? "border-[#f2d48a] bg-warn-soft" : "border-[#b7e0c9] bg-[#eefaf3]"}`}>
-      <b className={open ? "text-[#7a5a00]" : "text-[#11643f]"}>{open ? `Ask the expert (${open} open)` : "Answered by the expert"}</b>
-      <ul className="mt-1.5 space-y-2">
-        {qs.map((q) => (
-          <ExpertQuestion key={q} q={q} answer={step.answers?.find((x) => x.q === q)} canEdit={canEdit} onAnswer={(a) => onAnswer(q, a)} />
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function ExpertQuestion({ q, answer, canEdit, onAnswer }: { q: string; answer?: StepAnswer; canEdit: boolean; onAnswer: (a: string) => Promise<boolean> }) {
-  const [editing, setEditing] = useState(false);
-  const [text, setText] = useState(answer?.a ?? "");
-  const [saving, setSaving] = useState(false);
-  const [failed, setFailed] = useState(false);
-  async function save() {
-    setSaving(true);
-    setFailed(false);
-    const ok = await onAnswer(text);
-    setSaving(false);
-    if (ok) setEditing(false);
-    else setFailed(true);
-  }
-  return (
-    <li>
-      <div className="text-[#344054]"><span className="font-semibold">Q:</span> {q}</div>
-      {editing ? (
-        <div className="mt-1.5">
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            rows={2}
-            autoFocus
-            placeholder="The expert's answer, e.g. the receipt photo comes from the company card app."
-            className="w-full rounded-sm border border-[#9aa0a6] bg-white px-2.5 py-1.5 text-[14px] text-[#1f2d3d] focus:border-indigo focus:outline-none"
-          />
-          <div className="mt-1.5 flex items-center gap-2">
-            <button onClick={save} disabled={saving || !text.trim()} className="h-8 rounded-sm bg-indigo px-3 text-[13px] text-white hover:bg-indigo-dark disabled:opacity-50">
-              {saving ? "Saving…" : "Save answer"}
-            </button>
-            <button onClick={() => { setEditing(false); setText(answer?.a ?? ""); }} className="h-8 px-2 text-[13px] text-[#475467] hover:text-indigo">Cancel</button>
-            {failed && <span className="text-[13px] text-err">Couldn&apos;t save. Try again.</span>}
-          </div>
-        </div>
-      ) : answer ? (
-        <div className="mt-1 rounded-sm bg-white/80 px-2.5 py-1.5 text-[#1f2d3d]">
-          <span className="font-semibold text-[#11643f]">A:</span> {answer.a}
-          <span className="ml-2 text-[12px] text-[#667085]">{answer.by ? `${answer.by} · ` : ""}{new Date(answer.at).toLocaleDateString()}</span>
-          {canEdit && <button onClick={() => setEditing(true)} className="ml-2 text-[12.5px] text-indigo hover:underline">Edit</button>}
-        </div>
-      ) : canEdit ? (
-        <button onClick={() => setEditing(true)} className="mt-1 text-[13px] font-medium text-indigo hover:underline">+ Add the expert&apos;s answer</button>
-      ) : null}
-    </li>
-  );
-}
-
 function Block({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
       <div className="text-[12px] font-bold uppercase tracking-wide text-[#667085]">{title}</div>
       <ul className="mt-1 space-y-0.5 text-[#344054]">{children}</ul>
     </div>
-  );
-}
-
-function DataFlow({ steps, order }: { steps: WorkMapStep[]; order: Map<string, number> }) {
-  // Each input row: the data, where it comes from, and the step that uses it.
-  const rows = steps.flatMap((s) => (s.process?.inputs ?? []).map((x) => ({ name: x.name, source: x.source, usedIn: order.get(s.id) ?? 0 })));
-  if (!rows.length) return null;
-  return (
-    <>
-      <h2 className="mb-3 mt-4 text-[13px] font-bold uppercase tracking-[.12em] text-[#667085]">Data flow</h2>
-      <div className="overflow-x-auto rounded-md border border-line bg-white">
-        <table className="w-full min-w-[480px] text-left text-[14px]">
-          <thead className="bg-[#f9fafb] text-[12px] uppercase tracking-wide text-[#667085]">
-            <tr>
-              <th className="px-4 py-2 font-bold">Data or document</th>
-              <th className="px-4 py-2 font-bold">Comes from</th>
-              <th className="px-4 py-2 font-bold">Used in</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r, i) => (
-              <tr key={i} className="border-t border-line">
-                <td className="px-4 py-2 text-[#1f2d3d]">{r.name}</td>
-                <td className={`px-4 py-2 ${r.source === "unknown" ? "text-[#b25e09]" : "text-[#475467]"}`}>{r.source}</td>
-                <td className="px-4 py-2 text-[#475467]">step {r.usedIn}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </>
   );
 }

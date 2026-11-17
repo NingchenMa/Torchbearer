@@ -215,14 +215,14 @@ export default function VaultPage() {
                             )
                           ) : (
                             <Link prefetch={false} href={`/map?id=${encodeURIComponent(w.id)}`} className="tb-btn-dark group/btn h-10">
-                              Review and approve
+                              <MapIcon size={16} aria-hidden="true" /> Work Map
                               <ArrowRight size={16} className="transition-transform duration-200 group-hover/btn:translate-x-1" aria-hidden="true" />
                             </Link>
                           )}
+                          {/* One map per state: the Work Map (review, edit, approve) until approved, the Process map after. */}
                           {w.published && (
-                            <Link prefetch={false} href={`/map?id=${encodeURIComponent(w.id)}`} className="tb-btn-line h-10"><MapIcon size={16} aria-hidden="true" /> Work Map</Link>
+                            <Link prefetch={false} href={`/process?id=${encodeURIComponent(w.id)}`} className="tb-btn-line h-10"><GitBranch size={16} aria-hidden="true" /> Process map</Link>
                           )}
-                          <Link prefetch={false} href={`/process?id=${encodeURIComponent(w.id)}`} className="tb-btn-line h-10"><GitBranch size={16} aria-hidden="true" /> Process map</Link>
                           {manager && (
                             <button
                               onClick={() => { setConfirming(w.id); setDeleteError(null); }}
