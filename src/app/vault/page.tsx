@@ -207,7 +207,7 @@ export default function VaultPage() {
                           )}
                           {/* One map per state: the Work Map (review, edit, approve) until approved, the Process map after. */}
                           {w.published && (
-                            <Link prefetch={false} href={`/process?id=${encodeURIComponent(w.id)}`} className="tb-btn-line h-10"><GitBranch size={16} aria-hidden="true" /> Process map</Link>
+                            <Link prefetch={false} href={`/process?id=${encodeURIComponent(w.id)}`} className="tb-btn-dark h-10"><GitBranch size={16} aria-hidden="true" /> Process map</Link>
                           )}
                           {manager && (
                             <button
