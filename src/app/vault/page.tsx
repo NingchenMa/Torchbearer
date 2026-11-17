@@ -8,7 +8,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, GitBranch, Map as MapIcon, Search, Trash2, UserRound } from "lucide-react";
+import { GitBranch, Map as MapIcon, Search, Trash2, UserRound } from "lucide-react";
 import { stateOf, todayIso } from "@/lib/assignmentStatus";
 import { CountUp, Segmented, Spotlight, StepTrail } from "@/features/ui/fx";
 import type { AssignmentView, WorkflowSummary } from "@/lib/types";
@@ -28,7 +28,6 @@ export default function VaultPage() {
   const [confirming, setConfirming] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [asked, setAsked] = useState<string | null>(null); // an employee pressed "Train a new hire"
 
   useEffect(() => {
     fetch("/api/workflows", { cache: "no-store" })
@@ -201,22 +200,9 @@ export default function VaultPage() {
                     ) : (
                       <>
                         <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
-                          {w.published ? (
-                            manager ? (
-                              <Link prefetch={false} href={`/assign?workflow=${encodeURIComponent(w.id)}`} className="tb-btn-dark group/btn h-10">
-                                Train a new hire
-                                <ArrowRight size={16} className="transition-transform duration-200 group-hover/btn:translate-x-1" aria-hidden="true" />
-                              </Link>
-                            ) : (
-                              <button onClick={() => setAsked(asked === w.id ? null : w.id)} className="tb-btn-dark group/btn h-10">
-                                Train a new hire
-                                <ArrowRight size={16} className="transition-transform duration-200 group-hover/btn:translate-x-1" aria-hidden="true" />
-                              </button>
-                            )
-                          ) : (
-                            <Link prefetch={false} href={`/map?id=${encodeURIComponent(w.id)}`} className="tb-btn-dark group/btn h-10">
+                          {!w.published && (
+                            <Link prefetch={false} href={`/map?id=${encodeURIComponent(w.id)}`} className="tb-btn-dark h-10">
                               <MapIcon size={16} aria-hidden="true" /> Work Map
-                              <ArrowRight size={16} className="transition-transform duration-200 group-hover/btn:translate-x-1" aria-hidden="true" />
                             </Link>
                           )}
                           {/* One map per state: the Work Map (review, edit, approve) until approved, the Process map after. */}
@@ -234,11 +220,6 @@ export default function VaultPage() {
                             </button>
                           )}
                         </div>
-                        {asked === w.id && (
-                          <p className="mt-3 rounded-md bg-cream px-3 py-2 text-[14px] text-maroon-2" role="status">
-                            Only managers can assign workflows. Ask a manager to give this one to a new hire.
-                          </p>
-                        )}
                       </>
                     )}
                   </div>
