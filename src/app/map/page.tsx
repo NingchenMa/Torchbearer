@@ -66,7 +66,8 @@ export default function MappingPage() {
   const map = wf.map;
   const isExample = wf.id === EXAMPLE_ID;
 
-  const [view, setView] = useState<"check" | "final">("check");
+  // Not chosen yet (null): an approved workflow opens on the saved steps, one that needs approval on the checks.
+  const [view, setView] = useState<"check" | "final" | null>(null);
   const [draft, setDraft] = useState<WorkMapStep[] | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
