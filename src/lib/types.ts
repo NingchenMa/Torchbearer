@@ -75,7 +75,8 @@ export interface WorkMapStep {
   guardrails: string[];
   process?: StepProcess; // filled in by the process map (/process)
   answers?: StepAnswer[]; // the expert's answers to the process map's open questions (kept across rebuilds)
-  addedBy?: string; // set when someone added this step by hand on the process canvas (email); it has no recording
+  addedBy?: string; // set when someone added this step by hand (Work Map or process canvas, email); it has no recording
+  note?: string; // a note the expert or reviewer added to this step on the Work Map
 }
 export interface CanvasNote {
   id: string;
@@ -102,6 +103,7 @@ export interface StepProcess {
   feedsInto: string[]; // ids of later steps that use this step's outputs
   decision: string; // the judgment call made here and why; "" for routine steps
   unknown: string[]; // what couldn't be told from the recording: ask the expert
+  summary?: string; // the expert's explanation of this step in one or two plain sentences
 }
 
 /** One step of the workflow the vision LLM writes live from screenshots (+ the user's spoken answers). */

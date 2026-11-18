@@ -86,6 +86,8 @@ interface Props {
   me?: string;
   /** Tools and sites a hand-added step can be in (empty before the process map is built). */
   tools?: string[];
+  /** Open one step's details (the page shows them in a popup). Without it, a click scrolls to the step on the page. */
+  onOpenStep?: (id: string) => void;
 }
 
 export function ProcessCanvas(props: Props) {
@@ -96,7 +98,7 @@ export function ProcessCanvas(props: Props) {
   );
 }
 
-function Canvas({ timed, lanes, laneOf, color, fmt, map, onSave, me, tools = [] }: Props) {
+function Canvas({ timed, lanes, laneOf, color, fmt, map, onSave, me, tools = [], onOpenStep }: Props) {
   const flow = useReactFlow();
   const [hot, setHot] = useState<string | null>(null);
   // View (default): look, pan and zoom only. Edit: move, link, add and delete. Only with a save target.
@@ -110,7 +112,7 @@ function Canvas({ timed, lanes, laneOf, color, fmt, map, onSave, me, tools = [] 
     lanes.join(","),
     ...timed.map((t) => {
       const s = t.step;
-      return [s.id, s.title, s.decision, s.addedBy ?? "-", laneOf(s), color(lanes[laneOf(s)]), s.guardrails.join(";"), JSON.stringify(s.process ?? null), (s.answers ?? []).map((a) => `${a.q}=${a.a}`).join(";")].join("~");
+      return [s.id, s.title, s.decision, s.addedBy ?? "-", laneOf(s), color(lanes[laneOf(s)]), s.guardrails.join(";"), JSON.stringify(s.process ?? null), s.note ?? "", (s.answers ?? []).map((a) => `${a.q}=${a.a}`).join(";")].join("~");
     }),
   ].join("|");
 
@@ -449,7 +451,9 @@ function Canvas({ timed, lanes, laneOf, color, fmt, map, onSave, me, tools = [] 
 
   const openDetails = (n: Node) => {
     const id = n.type === "rule" ? (n.data as RuleData).stepId : n.id;
-    if (n.type === "step" || n.type === "rule") document.getElementById(`step-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (n.type !== "step" && n.type !== "rule") return;
+    if (onOpenStep) onOpenStep(id);
+    else document.getElementById(`step-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   if (!timed.length) return null;
@@ -646,12 +650,6 @@ function ManualStepNode({ id, data }: NodeProps) {
 function RecordedStepNode({ data }: NodeProps) {
   const { step: s, index, color, hot, notes } = data as StepData;
   const p = s.process;
-  // Questions for the expert on this step: answered ones with their answer, then the open ones.
-  const answered = s.answers ?? [];
-  const asked = new Set(answered.map((a) => a.q));
-  const openQs = (p?.unknown ?? []).filter((q) => !asked.has(q));
-  const qas: { q: string; a?: string }[] = [...answered.map((a) => ({ q: a.q, a: a.a })), ...openQs.map((q) => ({ q }))];
-  const shownQas = qas.slice(0, 2);
   const needs = p?.inputs.map((x) => x.name) ?? [];
   const makes = p?.outputs ?? [];
   return (
@@ -682,22 +680,11 @@ function RecordedStepNode({ data }: NodeProps) {
         ) : (
           <p className="line-clamp-3">{s.decision || s.short || "Recorded step"}</p>
         )}
-        {shownQas.length > 0 && (
-          <ul className="mt-1 flex flex-col gap-1 border-t border-line pt-1.5">
-            {shownQas.map(({ q, a }) => (
-              <li key={q} className={`rounded px-1.5 py-1 text-[11.5px] leading-snug ${a ? "bg-ok-soft" : "bg-warn-soft"}`}>
-                <p className={`line-clamp-2 ${a ? "text-[#2f4a3a]" : "text-[#6b5000]"}`}>
-                  <b>{a ? "Q:" : "? Ask:"}</b> {q}
-                </p>
-                {a && (
-                  <p className="mt-0.5 line-clamp-2 text-ok">
-                    <b>A:</b> {a}
-                  </p>
-                )}
-              </li>
-            ))}
-            {qas.length > 2 && <li className="text-[11px] text-muted">+{qas.length - 2} more in the step details</li>}
-          </ul>
+        {(p?.summary || s.note?.trim()) && (
+          <div className="mt-1 flex flex-col gap-1 border-t border-line pt-1.5 text-[11.5px] leading-snug">
+            {p?.summary && <p className="line-clamp-4 text-[#5b4b4e]">{p.summary}</p>}
+            {s.note?.trim() && <p className="line-clamp-2 rounded bg-[#fff1c2] px-1.5 py-1 text-[#6b5000]"><b>Note:</b> {s.note}</p>}
+          </div>
         )}
         {(s.guardrails.length > 0 || notes > 0 || s.addedBy !== undefined) && (
           <div className="mt-auto flex flex-wrap gap-1.5">
