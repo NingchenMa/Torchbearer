@@ -68,7 +68,7 @@ function Capture() {
         steps={[
           ["Launch", "TorchBearer pops out and floats on top of your screen."],
           ["Start recording", "Press it in TorchBearer and choose Entire screen."],
-          ["Work and explain", "Do the task in any browser tab and say out loud why you do each step. It asks when something isn't clear."],
+          ["Explain as you work", "Do the task in any browser tab and talk through each step. It asks when something isn't clear."],
         ]}
         title={<>Do the task. <span className="font-serif italic text-amber">Explain as you go.</span></>}
         text="TorchBearer floats on your screen while you work in any browser. It writes down each step from the screen and asks you why whenever something isn't clear. When you stop, you check what it wrote."
