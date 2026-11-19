@@ -1,6 +1,7 @@
 "use client";
 // The app's navigation, on the left of every page (a narrow icon rail on phones).
 //   Workflows   the vault, plus a workflow's Work Map and Process map
+//   Record workflow   the Teaching page: an expert records a new workflow
 //   Reviews     practice sessions to decide on, with a count of what is waiting
 //   Assign      give a workflow to a new hire (managers and admins only)
 //   Training    the work assigned to you
@@ -22,6 +23,7 @@ const Icon = ({ children }: { children: React.ReactNode }) => (
 
 const ITEMS = [
   { href: "/vault", label: "Workflows", match: ["/vault", "/map", "/process"], icon: <><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></> },
+  { href: "/capture", label: "Record workflow", match: ["/capture"], icon: <><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="3.5" fill="currentColor" /></> },
   { href: "/review", label: "Reviews", match: ["/review"], icon: <path d="M5 12l5 5L20 7" />, badge: true },
   { href: "/assign", label: "Assign", match: ["/assign"], icon: <path d="M12 5v14M5 12h14" /> },
 ];
