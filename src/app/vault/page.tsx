@@ -129,19 +129,6 @@ export default function VaultPage() {
               ]}
             />
           </div>
-          <label className="relative">
-            <span className="sr-only">Sort workflows</span>
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value as SortKey)}
-              className="h-11 cursor-pointer appearance-none rounded-full border border-line bg-white pl-4 pr-10 text-[15px] text-ink outline-none transition-[border-color,box-shadow] focus:border-crimson focus:ring-2 focus:ring-crimson/15"
-            >
-              {(Object.keys(SORTS) as SortKey[]).map((k) => (
-                <option key={k} value={k}>{SORTS[k].label}</option>
-              ))}
-            </select>
-            <ChevronDown size={16} className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-muted" aria-hidden="true" />
-          </label>
           <Link prefetch={false} href="/capture" className="tb-btn-amber h-11">
             <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-crimson" aria-hidden="true" /> Record a new workflow
           </Link>
@@ -171,6 +158,23 @@ export default function VaultPage() {
         ) : shown.length === 0 ? (
           <p className="mt-10 text-[16px] text-muted">No workflows match &ldquo;{query}&rdquo;.</p>
         ) : (
+          <>
+          <div className="mb-3 flex items-center justify-end gap-2 text-[14px] text-muted">
+            <label htmlFor="vault-sort">Sort by</label>
+            <span className="relative">
+              <select
+                id="vault-sort"
+                value={sort}
+                onChange={(e) => setSort(e.target.value as SortKey)}
+                className="h-9 cursor-pointer appearance-none rounded-full border border-line bg-white pl-3.5 pr-9 text-[14px] text-ink outline-none transition-[border-color,box-shadow] focus:border-crimson focus:ring-2 focus:ring-crimson/15"
+              >
+                {(Object.keys(SORTS) as SortKey[]).map((k) => (
+                  <option key={k} value={k}>{SORTS[k].label}</option>
+                ))}
+              </select>
+              <ChevronDown size={15} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted" aria-hidden="true" />
+            </span>
+          </div>
           <ul className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
             {shown.map((w, k) => {
               const learning = assignments.filter((a) => a.workflowId === w.id && stateOf(a, today) !== "done");
@@ -255,6 +259,7 @@ export default function VaultPage() {
               );
             })}
           </ul>
+          </>
         )}
       </main>
     </div>
