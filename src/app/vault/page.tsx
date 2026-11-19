@@ -8,7 +8,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { GitBranch, Map as MapIcon, Search, Trash2, UserRound } from "lucide-react";
+import { ChevronDown, GitBranch, Map as MapIcon, Search, Trash2, UserRound } from "lucide-react";
 import { stateOf, todayIso } from "@/lib/assignmentStatus";
 import { CountUp, Segmented, Spotlight, StepTrail } from "@/features/ui/fx";
 import type { AssignmentView, WorkflowSummary } from "@/lib/types";
@@ -19,12 +19,27 @@ const day = (iso: string) => {
   return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 };
 
+type SortKey = "newest" | "oldest" | "nameAZ" | "nameZA" | "mostSteps" | "fewestSteps" | "status";
+const byNewest = (a: WorkflowSummary, b: WorkflowSummary) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0);
+const byName = (a: WorkflowSummary, b: WorkflowSummary) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
+/** How the Workflows cards can be ordered; ties fall back to newest first. */
+const SORTS: Record<SortKey, { label: string; compare: (a: WorkflowSummary, b: WorkflowSummary) => number }> = {
+  newest: { label: "Newest first", compare: byNewest },
+  oldest: { label: "Oldest first", compare: (a, b) => byNewest(b, a) },
+  nameAZ: { label: "Name A to Z", compare: (a, b) => byName(a, b) || byNewest(a, b) },
+  nameZA: { label: "Name Z to A", compare: (a, b) => byName(b, a) || byNewest(a, b) },
+  mostSteps: { label: "Most steps", compare: (a, b) => b.stepCount - a.stepCount || byNewest(a, b) },
+  fewestSteps: { label: "Fewest steps", compare: (a, b) => a.stepCount - b.stepCount || byNewest(a, b) },
+  status: { label: "Needs approval first", compare: (a, b) => Number(a.published) - Number(b.published) || byNewest(a, b) },
+};
+
 export default function VaultPage() {
   const { manager, loading: meLoading } = useMe();
   const [list, setList] = useState<WorkflowSummary[] | null>(null);
   const [assignments, setAssignments] = useState<AssignmentView[]>([]);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "approved" | "draft">("all");
+  const [sort, setSort] = useState<SortKey>("newest");
   const [confirming, setConfirming] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -66,8 +81,8 @@ export default function VaultPage() {
       .filter((w) => (filter === "all" ? true : filter === "approved" ? w.published : !w.published))
       // Searching by expert is for people who can see everyone's workflows.
       .filter((w) => !q || w.name.toLowerCase().includes(q) || (manager && (w.trainedBy ?? "").toLowerCase().includes(q)))
-      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-  }, [list, query, filter, manager]);
+      .sort(SORTS[sort].compare);
+  }, [list, query, filter, manager, sort]);
   const total = (list ?? []).length;
   const approved = (list ?? []).filter((w) => w.published).length;
   const drafts = total - approved;
@@ -114,6 +129,19 @@ export default function VaultPage() {
               ]}
             />
           </div>
+          <label className="relative">
+            <span className="sr-only">Sort workflows</span>
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value as SortKey)}
+              className="h-11 cursor-pointer appearance-none rounded-full border border-line bg-white pl-4 pr-10 text-[15px] text-ink outline-none transition-[border-color,box-shadow] focus:border-crimson focus:ring-2 focus:ring-crimson/15"
+            >
+              {(Object.keys(SORTS) as SortKey[]).map((k) => (
+                <option key={k} value={k}>{SORTS[k].label}</option>
+              ))}
+            </select>
+            <ChevronDown size={16} className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-muted" aria-hidden="true" />
+          </label>
           <Link prefetch={false} href="/capture" className="tb-btn-amber h-11">
             <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-crimson" aria-hidden="true" /> Record a new workflow
           </Link>
