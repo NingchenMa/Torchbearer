@@ -26,14 +26,17 @@ interface Props {
   /** Small links to the other modules (there is no header bar). */
   links?: { href: string; label: string }[];
   notice?: ReactNode;
+  /** The three "How it works" steps; defaults to the training wording. */
+  steps?: [string, string][];
 }
 
-export default function Launcher({ eyebrow, title, text, launched, canPip, failed = false, micError, onLaunch, panel, demo, links, notice, startArea }: Props) {
-  const steps: [string, string][] = [
-    ["Launch", "TorchBearer pops out and floats on top of your screen."],
-    ["Start recording", "Press it in TorchBearer and choose Entire screen."],
-    ["Work as usual", "In any browser tab. It watches, and asks only at a pause."],
-  ];
+const DEFAULT_STEPS: [string, string][] = [
+  ["Launch", "TorchBearer pops out and floats on top of your screen."],
+  ["Start recording", "Press it in TorchBearer and choose Entire screen."],
+  ["Work as usual", "In any browser tab. It watches, and asks only at a pause."],
+];
+
+export default function Launcher({ eyebrow, title, text, launched, canPip, failed = false, micError, onLaunch, panel, demo, links, notice, startArea, steps = DEFAULT_STEPS }: Props) {
   return (
     <section className="relative min-h-full bg-cream">
       <div className="tb-hero relative overflow-hidden">

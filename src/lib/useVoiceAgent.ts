@@ -11,6 +11,7 @@ export function useVoiceAgent(role: "interviewer" | "tutor") {
   const [transcript, setTranscript] = useState<TranscriptLine[]>([]);
   const [error, setError] = useState<string | null>(null);
   const lastUserSpeech = useRef(0);
+  const lastAgentSpeech = useRef(0); // when the agent last said something (its reply may still be playing)
 
   const conv = useConversation({
     onMessage: ({ message, role: from }) => {
@@ -19,6 +20,7 @@ export function useVoiceAgent(role: "interviewer" | "tutor") {
       const text = from === "user" ? message : message.replace(/\[[A-Za-z ]{1,20}\]\s*/g, "").trim();
       if (!text) return;
       if (from === "user") lastUserSpeech.current = Date.now();
+      else lastAgentSpeech.current = Date.now();
       setTranscript((t) => [...t, { time: elapsed(), speaker: from === "user" ? "expert" : "agent", text }]);
     },
     onError: (message) => setError(String(message)),
@@ -39,7 +41,7 @@ export function useVoiceAgent(role: "interviewer" | "tutor") {
     }
   }
 
-  return { ...conv, start, transcript, error, connected: conv.status === "connected", lastUserSpeech };
+  return { ...conv, start, transcript, error, connected: conv.status === "connected", lastUserSpeech, lastAgentSpeech };
 }
 
 /** Ask for the microphone early (e.g. on the Launch click, while the page is in front), so the

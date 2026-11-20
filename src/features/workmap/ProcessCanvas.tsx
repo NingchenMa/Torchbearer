@@ -434,19 +434,37 @@ function Canvas({ timed, lanes, laneOf, color, fmt, map, onSave, me, tools = [],
     for (const e of edges) if ((e.data as EdgeData)?.kind === "note") m.set(e.target, (m.get(e.target) ?? 0) + 1);
     return m;
   }, [edges]);
+  // Panning stops a little past the boxes, so the map can't be dragged out of sight.
+  const extent = useMemo((): [[number, number], [number, number]] => {
+    const pad = 400;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const n of nodes) {
+      const w = n.measured?.width ?? n.width ?? (typeof n.style?.width === "number" ? n.style.width : 300);
+      const h = n.measured?.height ?? n.height ?? (typeof n.style?.height === "number" ? n.style.height : LANE_H);
+      x0 = Math.min(x0, n.position.x);
+      y0 = Math.min(y0, n.position.y);
+      x1 = Math.max(x1, n.position.x + w);
+      y1 = Math.max(y1, n.position.y + h);
+    }
+    if (!Number.isFinite(x0)) return [[-Infinity, -Infinity], [Infinity, Infinity]];
+    return [[x0 - pad, y0 - pad], [x1 + pad, y1 + pad]];
+  }, [nodes]);
+
   const shownNodes = useMemo(
     () => nodes.map((n) => (n.type === "step" ? { ...n, data: { ...(n.data as StepData), hot: n.id === hot, notes: notesPer.get(n.id) ?? 0 } } : n)),
     [nodes, hot, notesPer],
   );
   const shownEdges = useMemo(
     () =>
-      edges.map((e) => {
+      // The data links (dashed yellow) read as a second, confusing set of arrows: in view mode only
+      // the step order is drawn; what each step needs and produces is written on its box.
+      edges.filter((e) => editable || (e.data as EdgeData)?.kind !== "data").map((e) => {
         const d = e.data as EdgeData;
         const on = hot !== null && (e.source === hot || e.target === hot);
         const label = d.kind === "next" && stepIds.has(e.source) ? fmt(durationOf.get(e.source) ?? null) : undefined;
         return { ...e, data: { ...d, hot: on, dim: hot !== null && !on, label: label && label !== "–" ? label : undefined } };
       }),
-    [edges, hot, stepIds, durationOf, fmt],
+    [edges, hot, stepIds, durationOf, fmt, editable],
   );
 
   const openDetails = (n: Node) => {
@@ -552,6 +570,7 @@ function Canvas({ timed, lanes, laneOf, color, fmt, map, onSave, me, tools = [],
           fitViewOptions={{ nodes: boxes.slice(0, 6), padding: 0.1, maxZoom: 1 }}
           minZoom={0.25}
           maxZoom={1.6}
+          translateExtent={extent}
           proOptions={{ hideAttribution: true }}
         >
           <Background variant={BackgroundVariant.Dots} gap={18} size={1.4} color="#ddc9cc" />

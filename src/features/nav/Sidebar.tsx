@@ -1,5 +1,6 @@
 "use client";
 // The app's navigation, on the left of every page (a narrow icon rail on phones).
+//   Record workflow   on its own at the top: the Teaching page, where an expert records a new workflow
 //   Workflows   the vault, plus a workflow's Work Map and Process map
 //   Reviews     practice sessions to decide on, with a count of what is waiting
 //   Assign      give a workflow to a new hire (managers and admins only)
@@ -25,6 +26,7 @@ const ITEMS = [
   { href: "/review", label: "Reviews", match: ["/review"], icon: <path d="M5 12l5 5L20 7" />, badge: true },
   { href: "/assign", label: "Assign", match: ["/assign"], icon: <path d="M12 5v14M5 12h14" /> },
 ];
+const RECORD = { href: "/capture", label: "Record workflow", match: ["/capture"], icon: <><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="3.5" fill="currentColor" /></> };
 const TRAINING = { href: "/teach", label: "Training", match: ["/teach"], icon: <><path d="M4 6l8-3 8 3-8 3-8-3z" /><path d="M7 10.5V15c0 1.5 2.5 3 5 3s5-1.5 5-3v-4.5" /></> };
 const ACCESS = { href: "/access", label: "Access management", match: ["/access"], icon: <><path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6l8-3z" /><path d="M9 12l2 2 4-4" /></> };
 
@@ -88,6 +90,8 @@ export default function Sidebar() {
           {me && me.org !== "torchbearer" && <span className="block max-w-[150px] truncate font-serif text-[12.5px] italic text-amber">{companyName(me.org)}</span>}
         </span>
       </Link>
+
+      <nav className="mb-4 flex flex-col gap-1 md:mb-5" aria-label="Record">{link(RECORD)}</nav>
 
       <div className="mx-2 mb-2 mt-1 hidden text-[11.5px] font-bold uppercase tracking-[.16em] text-blush-2/70 md:block">Workflows</div>
       <nav className="flex flex-col gap-1" aria-label="Workflows">{items.map(link)}</nav>

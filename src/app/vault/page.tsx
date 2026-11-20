@@ -8,7 +8,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { GitBranch, Map as MapIcon, Search, Trash2, UserRound } from "lucide-react";
+import { ChevronDown, GitBranch, Map as MapIcon, Search, Trash2, UserRound } from "lucide-react";
 import { stateOf, todayIso } from "@/lib/assignmentStatus";
 import { CountUp, Segmented, Spotlight, StepTrail } from "@/features/ui/fx";
 import type { AssignmentView, WorkflowSummary } from "@/lib/types";
@@ -19,12 +19,27 @@ const day = (iso: string) => {
   return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 };
 
+type SortKey = "newest" | "oldest" | "nameAZ" | "nameZA" | "mostSteps" | "fewestSteps" | "status";
+const byNewest = (a: WorkflowSummary, b: WorkflowSummary) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0);
+const byName = (a: WorkflowSummary, b: WorkflowSummary) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
+/** How the Workflows cards can be ordered; ties fall back to newest first. */
+const SORTS: Record<SortKey, { label: string; compare: (a: WorkflowSummary, b: WorkflowSummary) => number }> = {
+  newest: { label: "Newest first", compare: byNewest },
+  oldest: { label: "Oldest first", compare: (a, b) => byNewest(b, a) },
+  nameAZ: { label: "Name A to Z", compare: (a, b) => byName(a, b) || byNewest(a, b) },
+  nameZA: { label: "Name Z to A", compare: (a, b) => byName(b, a) || byNewest(a, b) },
+  mostSteps: { label: "Most steps", compare: (a, b) => b.stepCount - a.stepCount || byNewest(a, b) },
+  fewestSteps: { label: "Fewest steps", compare: (a, b) => a.stepCount - b.stepCount || byNewest(a, b) },
+  status: { label: "Needs approval first", compare: (a, b) => Number(a.published) - Number(b.published) || byNewest(a, b) },
+};
+
 export default function VaultPage() {
   const { manager, loading: meLoading } = useMe();
   const [list, setList] = useState<WorkflowSummary[] | null>(null);
   const [assignments, setAssignments] = useState<AssignmentView[]>([]);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "approved" | "draft">("all");
+  const [sort, setSort] = useState<SortKey>("newest");
   const [confirming, setConfirming] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -66,8 +81,8 @@ export default function VaultPage() {
       .filter((w) => (filter === "all" ? true : filter === "approved" ? w.published : !w.published))
       // Searching by expert is for people who can see everyone's workflows.
       .filter((w) => !q || w.name.toLowerCase().includes(q) || (manager && (w.trainedBy ?? "").toLowerCase().includes(q)))
-      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-  }, [list, query, filter, manager]);
+      .sort(SORTS[sort].compare);
+  }, [list, query, filter, manager, sort]);
   const total = (list ?? []).length;
   const approved = (list ?? []).filter((w) => w.published).length;
   const drafts = total - approved;
@@ -143,6 +158,23 @@ export default function VaultPage() {
         ) : shown.length === 0 ? (
           <p className="mt-10 text-[16px] text-muted">No workflows match &ldquo;{query}&rdquo;.</p>
         ) : (
+          <>
+          <div className="mb-3 flex items-center justify-end gap-2 text-[14px] text-muted">
+            <label htmlFor="vault-sort">Sort by</label>
+            <span className="relative">
+              <select
+                id="vault-sort"
+                value={sort}
+                onChange={(e) => setSort(e.target.value as SortKey)}
+                className="h-9 cursor-pointer appearance-none rounded-full border border-line bg-white pl-3.5 pr-9 text-[14px] text-ink outline-none transition-[border-color,box-shadow] focus:border-crimson focus:ring-2 focus:ring-crimson/15"
+              >
+                {(Object.keys(SORTS) as SortKey[]).map((k) => (
+                  <option key={k} value={k}>{SORTS[k].label}</option>
+                ))}
+              </select>
+              <ChevronDown size={15} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted" aria-hidden="true" />
+            </span>
+          </div>
           <ul className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
             {shown.map((w, k) => {
               const learning = assignments.filter((a) => a.workflowId === w.id && stateOf(a, today) !== "done");
@@ -163,7 +195,7 @@ export default function VaultPage() {
                   <div className="mt-4">
                     <StepTrail count={w.stepCount} lit={!!w.published} />
                     <p className="mt-2 text-[13.5px] text-muted">
-                      {w.stepCount} step{w.stepCount === 1 ? "" : "s"}
+                      {w.role ? `${w.role} · ` : ""}{w.stepCount} step{w.stepCount === 1 ? "" : "s"}
                       {day(w.createdAt) ? ` · ${day(w.createdAt)}` : ""}
                     </p>
                   </div>
@@ -227,6 +259,7 @@ export default function VaultPage() {
               );
             })}
           </ul>
+          </>
         )}
       </main>
     </div>
