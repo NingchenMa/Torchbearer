@@ -28,22 +28,6 @@ const readId = () => {
 const corrected = (s: WorkMapStep): WorkMapStep =>
   s.review === "wrong" && s.correction?.trim() ? { ...s, title: s.correction.trim(), decision: `Corrected by the expert (Torchbearer saw: ${s.title})` } : s;
 
-/**
- * The process map details (tool, data, decision) were built from a step's old wording: when the title,
- * reason or rules change, drop them so the process map rebuilds that step.
- */
-function invalidate(next: WorkMapStep[], before: WorkMapStep[]): WorkMapStep[] {
-  const old = new Map(before.map((s) => [s.id, s]));
-  return next.map((s) => {
-    const o = old.get(s.id);
-    const same = o && o.title === s.title && o.reason === s.reason && o.guardrails.join(";") === s.guardrails.join(";");
-    if (same || !s.process) return s;
-    const { process: _drop, ...rest } = s;
-    void _drop;
-    return rest;
-  });
-}
-
 export default function MappingPage() {
   const router = useRouter();
   const idParam = useSyncExternalStore(() => () => {}, readId, () => null);
@@ -178,22 +162,34 @@ export default function MappingPage() {
       </button>
     </span>
   );
-  /** Approve the steps (the corrected ones from the checks, or the edited saved ones), then show the process map. */
+  const [building, setBuilding] = useState(false); // saving, then building the process map, before it opens
+
+  /**
+   * Approve the steps (the corrected ones from the checks, or the edited saved ones), rebuild the process
+   * map for them, then open it already built. If the build fails, the process map page builds it on opening
+   * (every step's old tools and data are dropped here, since they were made from the previous steps).
+   */
   async function save() {
     const from = showFinal ? finalSteps : map.steps.map(corrected);
-    const steps = invalidate(
-      from.filter((s) => s.title.trim()).map((s, i) => ({ ...s, order: i + 1, review: "ok" as const, correction: undefined })),
-      map.steps,
-    );
+    const steps = from
+      .filter((s) => s.title.trim())
+      .map((s, i) => {
+        const { process: _old, ...rest } = s;
+        void _old;
+        return { ...rest, order: i + 1, review: "ok" as const, correction: undefined };
+      });
     const next = { ...wf, map: { ...map, steps, published: true, confirmed: true } };
     clearTimeout(saveTimer.current);
     setRecord(next);
     setSaveState("saving");
     setDraft(null);
     setEditing(null);
+    setBuilding(true);
     const ok = await saveWorkflow(next);
     setSaveState(ok ? "saved" : "error");
-    if (ok) router.push(`/process?id=${encodeURIComponent(wf.id)}`);
+    if (!ok) return setBuilding(false);
+    await fetch("/api/processmap", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: wf.id }) }).catch(() => null);
+    router.push(`/process?id=${encodeURIComponent(wf.id)}`);
   }
   function switchTo(id: string) {
     window.location.search = `?id=${id}`;
@@ -210,6 +206,16 @@ export default function MappingPage() {
     return <div className="grid min-h-full place-items-center bg-[#f6f8fc] text-[15px] text-[#667085]">Loading the workflow from the database…</div>;
   }
   if (denied) return <NoAccess message="You lack permission to edit or review this workflow." />;
+  if (building) {
+    return (
+      <div className="grid min-h-full place-items-center bg-[#f6f8fc] p-6 text-center">
+        <div>
+          <div className="mx-auto h-9 w-9 animate-spin rounded-full border-[3px] border-indigo/20 border-t-indigo" aria-hidden="true" />
+          <p className="mt-4 text-[16px] text-[#475467]">Saving “{wf.name}” and building its process map…</p>
+        </div>
+      </div>
+    );
+  }
   if (loadFailed) {
     return (
       <div className="grid min-h-full place-items-center bg-[#f6f8fc] p-6 text-center">
@@ -394,8 +400,8 @@ export default function MappingPage() {
                 </button>
               )}
               <span className="text-[14px] text-[#667085]">{allChecked ? "All steps checked." : `${map.steps.length - checked} step(s) left to check.`}</span>
-              <button className="h-11 rounded-sm bg-indigo px-5 text-[15px] text-white hover:bg-indigo-dark disabled:opacity-40" onClick={save} disabled={!allChecked || isExample || saveState === "saving"}>
-                ✓ Save workflow → process map
+              <button className="h-11 rounded-sm bg-indigo px-5 text-[15px] text-white hover:bg-indigo-dark disabled:opacity-40" onClick={save} disabled={!allChecked || isExample || building}>
+                {building ? "Saving and building the process map…" : "✓ Save workflow → process map"}
               </button>
             </div>
           </>
@@ -457,8 +463,8 @@ export default function MappingPage() {
                   ← Revise
                 </button>
                 {(draft || !approved) && (
-                  <button className="h-11 rounded-sm bg-indigo px-5 text-[15px] text-white hover:bg-indigo-dark" onClick={save}>
-                    ✓ Save workflow → process map
+                  <button className="h-11 rounded-sm bg-indigo px-5 text-[15px] text-white hover:bg-indigo-dark disabled:opacity-60" onClick={save} disabled={building}>
+                    {building ? "Saving and building the process map…" : "✓ Save workflow → process map"}
                   </button>
                 )}
               </div>

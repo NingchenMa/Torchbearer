@@ -209,14 +209,15 @@ export default function ProcessMapPage() {
         </div>
       </section>
 
+      {!built && building ? (
+        <div className="mx-auto max-w-6xl px-4 py-16 text-center sm:px-6">
+          <div className="mx-auto h-9 w-9 animate-spin rounded-full border-[3px] border-indigo/20 border-t-indigo" aria-hidden="true" />
+          <p className="mt-4 text-[16px] text-[#475467]">Building the process map: the tool, data and decisions for each step…</p>
+        </div>
+      ) : (
+      <>
       {/* The diagram gets the full screen width; the reading sections below keep the page width. */}
       <div className="mx-auto max-w-[1720px] px-4 pt-6 sm:px-6">
-        {!built && building && (
-          <p className="mb-5 rounded-md border border-dashed border-[#b9bdc4] bg-white px-4 py-3 text-[14.5px] text-[#475467]">
-            Showing step times while the tools and data for each step are worked out…
-          </p>
-        )}
-
         {/* The whole process as a diagram: lanes per tool, rules as diamonds, durations on the arrows */}
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-[13px] font-bold uppercase tracking-[.12em] text-[#667085]">Process diagram</h2>
@@ -346,6 +347,9 @@ export default function ProcessMapPage() {
         </ol>
 
       </div>
+
+      </>
+      )}
 
       {/* A step's screenshot, full size */}
       {zoom && (
