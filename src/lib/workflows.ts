@@ -11,6 +11,7 @@ export const workflowPath = (id: string) => `workflows/${safe(id)}.json`;
 export const summaryOf = (w: WorkflowRecord, trainedBy?: string): WorkflowSummary => ({
   id: w.id,
   name: w.name,
+  ...(w.role ? { role: w.role } : {}),
   createdAt: w.createdAt,
   published: !!w.map.published,
   stepCount: w.map.steps.length,

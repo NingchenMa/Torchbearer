@@ -32,11 +32,12 @@ function Capture() {
     router.push(`/map?id=${id}`);
   });
   const canPip = useSyncExternalStore(() => () => {}, pipSupported, () => true);
-  const bot = <ObserverPanel o={o} onStart={(name) => o.start(name)} />;
+  const bot = <ObserverPanel o={o} onStart={(name, role) => o.start(name, role)} />;
   const [name, setName] = useState("");
+  const [role, setRole] = useState("");
   const startArea = o.sharing ? (
     <div className="text-[15px]">
-      <div className="font-medium text-err">● Recording “{name || "workflow"}”</div>
+      <div className="font-medium text-err">● Recording “{name || "workflow"}”{role.trim() ? ` · ${role.trim()}` : ""}</div>
       <p className="mt-1 text-[14px] text-[#475467]">Switch to your work. Stop recording in the floating Torchbearer when you&apos;re done.</p>
     </div>
   ) : (
@@ -46,11 +47,19 @@ function Capture() {
         id="page-wf-name"
         value={name}
         onChange={(e) => setName(e.target.value)}
-        placeholder="e.g. Meal expense report"
+        placeholder="e.g. Paying a bill"
+        className="h-11 rounded-full border border-line px-4 text-[16px] outline-none transition-[border-color,box-shadow] focus:border-crimson focus:ring-2 focus:ring-crimson/15"
+      />
+      <label htmlFor="page-wf-role" className="mt-1 text-[12px] font-bold uppercase tracking-[.14em] text-crimson">Your role</label>
+      <input
+        id="page-wf-role"
+        value={role}
+        onChange={(e) => setRole(e.target.value)}
+        placeholder="e.g. Accounts payable"
         className="h-11 rounded-full border border-line px-4 text-[16px] outline-none transition-[border-color,box-shadow] focus:border-crimson focus:ring-2 focus:ring-crimson/15"
       />
       <button
-        onClick={() => o.start(name)}
+        onClick={() => o.start(name, role)}
         disabled={!name.trim()}
         className="tb-btn-amber h-12 w-full text-[16px] disabled:cursor-not-allowed disabled:opacity-40"
       >

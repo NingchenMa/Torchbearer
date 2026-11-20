@@ -135,6 +135,8 @@ export interface ReviewItem {
 export interface WorkflowRecord {
   id: string;
   name: string;
+  /** The role of the person who does this work, e.g. "Accounts payable" (asked when recording). */
+  role?: string;
   createdAt: string;
   map: WorkMap;
   /** Cognito user ID of whoever recorded it. Set by the server on first save, never by the browser. */
@@ -145,6 +147,7 @@ export interface WorkflowRecord {
 export interface WorkflowSummary {
   id: string;
   name: string;
+  role?: string;
   createdAt: string;
   published: boolean;
   stepCount: number;

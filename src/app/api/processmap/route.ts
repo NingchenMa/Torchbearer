@@ -27,10 +27,10 @@ For EVERY step return:
 - tool: the app, system, site or document the step happens in, as specific as the screen shows (e.g. "Ledgerline · expense form", "Outlook", "Supplier portal"). Use the same name for the same tool across steps.
 - action: what kind of action the step is, exactly one of: "Find and open" (navigate, search, open or start something), "Enter data" (type or fill in information), "Check and decide" (review, verify, compare, approve or choose), "Attach files" (upload or attach a document), "Submit and send" (submit, save, send or share the result). Use "Other" only if none fits.
 - inputs: the data or documents the step needs, each with where it comes from: an earlier step by its number ("step 2"), never its [id], a person or team ("from the supervisor"), a system ("from the travel booking"), or "unknown". Only real information or documents (e.g. "receipt", "project number", "supervisor approval"), not every field on screen, and NEVER the fact that an earlier step was done ("form opened", "details filled" are not inputs). Name documents by their kind only ("receipt", "approval email"), never with a shop, restaurant, platform, person or file name ("receipt", not "Bitebox receipt").
-- outputs: what the step produces or changes (a saved form, an attached document, an approval, a status).
+- outputs: what the step produces or changes, as the information or result a later step can use (e.g. "invoice details: number, PO, amount, bank account", "supplier bank account confirmed", "meeting with the finance manager booked", "bill saved on hold"), not just that something was opened.
 - feedsInto: ids of LATER steps that use this step's outputs. [] if none.
-- decision: the judgment call made in this step and the reason, from the expert's reason/rules. "" for routine steps. Never invent a reason.
-- summary: one or two plain sentences that sum up what the expert explained about this step: what they do and why, in the third person ("The expert checks the total against the receipt because…"). Build it from the expert's reason, rules and answers. Never a question and answer list, never invented. "" if the expert explained nothing about this step.
+- decision: the judgment call made in this step and the reason, ONLY from the expert's why/rules/answers. "" for routine steps and for any step where the expert gave no why, rule or answer. Never invent a reason.
+- summary: one or two plain sentences that sum up what the expert explained about this step: what they do and why, in the third person ("The expert checks the total against the receipt because…"). Build it from the expert's reason, rules and answers. Never a question and answer list, never invented. "" if the expert explained nothing about this step (no why, rule or answer): never describe the screen here.
 - unknown: short questions to the expert, one per unclear point (always one for an input whose source is unknown), about what the recording can't tell (where an input comes from, who receives the output, a missing reason). [] if nothing important is unclear.
 
 Expert answers: when a step lists "expert answered", use those answers (for example as an input's source or the decision's reason) and never ask that question again.
@@ -66,7 +66,7 @@ export async function POST(req: Request) {
   const every = Math.max(1, Math.ceil(withShots.length / MAX_SHOTS));
   const shots = withShots.filter((_, i) => i % every === 0).slice(0, MAX_SHOTS);
   const parts = [
-    { text: `TASK: ${record.name}\n\nSTEPS:\n${list}` },
+    { text: `TASK: ${record.name}${record.role ? `\nROLE OF THE PERSON WHO DOES IT: ${record.role}` : ""}\n\nSTEPS:\n${list}` },
     ...shots.flatMap((s) => [{ text: `Screenshot of step [${s.id}]:` }, toPart(s.screenshot!)]),
   ];
 
@@ -93,6 +93,7 @@ export async function POST(req: Request) {
           .map((x) => ({ name: str(x?.name), source: stepRefs(str(x?.source)) || "unknown" }))
           .filter((x) => x.name);
         const answered = new Set((s.answers ?? []).map((x) => x.q.trim().toLowerCase()));
+        const spoke = !!(s.reason?.trim() || s.guardrails.length || s.answers?.length || s.correction?.trim() || s.note?.trim());
         const unknown = strs(p.unknown).map(stepRefs).filter((q) => !answered.has(q.trim().toLowerCase()));
         // An input nobody knows the source of is a question for the expert (unless the model already asked one).
         if (!unknown.length)
@@ -105,9 +106,10 @@ export async function POST(req: Request) {
             inputs,
             outputs: strs(p.outputs),
             feedsInto: strs(p.feedsInto).filter((x) => ids.has(x) && later.has(x)),
-            decision: stepRefs(str(p.decision)),
+            // Decision and summary are the expert's explanation: none without anything the expert said.
+            decision: spoke ? stepRefs(str(p.decision)) : "",
             unknown,
-            ...(str(p.summary) ? { summary: str(p.summary) } : {}),
+            ...(spoke && str(p.summary) ? { summary: str(p.summary) } : {}),
           },
         };
       }),

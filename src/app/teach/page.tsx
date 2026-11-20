@@ -89,7 +89,7 @@ function Teach() {
     <div className="flex flex-col gap-2">
       <div className="text-[15px]">Practising: <b>{selected.name}</b></div>
       <button onClick={c.start} className="tb-btn-amber h-12 w-full text-[16px]">
-        {c.finished ? "● Practise again" : "● Start recording"}
+        {c.finished ? "● Practise again" : "● Start training"}
       </button>
       <p className="text-[13px] text-muted">Chrome will ask what to share: choose <b>Entire screen</b>.</p>
       {c.error && <p className="rounded-md bg-err-soft px-3 py-2 text-[13.5px] text-[#8E1B1B]">{c.error}</p>}

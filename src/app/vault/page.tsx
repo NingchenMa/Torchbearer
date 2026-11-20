@@ -195,7 +195,7 @@ export default function VaultPage() {
                   <div className="mt-4">
                     <StepTrail count={w.stepCount} lit={!!w.published} />
                     <p className="mt-2 text-[13.5px] text-muted">
-                      {w.stepCount} step{w.stepCount === 1 ? "" : "s"}
+                      {w.role ? `${w.role} · ` : ""}{w.stepCount} step{w.stepCount === 1 ? "" : "s"}
                       {day(w.createdAt) ? ` · ${day(w.createdAt)}` : ""}
                     </p>
                   </div>

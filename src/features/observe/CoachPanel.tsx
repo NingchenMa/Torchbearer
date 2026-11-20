@@ -125,7 +125,7 @@ export default function CoachPanel({ c, workflows, selected, onSelect }: Props) 
                 <button className="h-9 rounded-sm border border-indigo bg-white px-3 text-[14px] text-indigo hover:bg-indigo-soft" onClick={() => onSelect(null)}>
                   ← Workflows
                 </button>
-                <button className={`${btnPrimary} flex-1`} onClick={c.start}>{c.finished ? "● Practise again" : "● Start recording"}</button>
+                <button className={`${btnPrimary} flex-1`} onClick={c.start}>{c.finished ? "● Practise again" : "● Start training"}</button>
               </>
             ) : (
               <button className={`${btnPrimary} flex-1`} onClick={c.stop}>Stop recording</button>

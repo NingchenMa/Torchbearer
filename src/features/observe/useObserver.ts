@@ -20,7 +20,14 @@ const IDLE_MS = 8000; // how long screen and voice must both be still to count a
 
 export type ObserverStatus = "idle" | "connecting" | "watching" | "reading" | "asking" | "off_record" | "debrief" | "building";
 
-/** Pair each question the agent asked with the expert's spoken answer (follow-up lines are appended). */
+/** What the expert said without being asked: their own narration, written into the workflow like an answer. */
+export const NARRATION = "(The expert explained this while working, without being asked.)";
+
+/**
+ * Pair each question the agent asked with the expert's spoken answer (follow-up lines are appended).
+ * What the expert says on their own while working is kept too, as narration: it is often the best
+ * explanation of a step, and without it nothing they say unprompted reaches the workflow.
+ */
 function pairAnswers(transcript: TranscriptLine[]): ObserveQA[] {
   const pairs: ObserveQA[] = [];
   let open: string | null = null;
@@ -35,6 +42,10 @@ function pairAnswers(transcript: TranscriptLine[]): ObserveQA[] {
       answering = true;
     } else if (answering && pairs.length) {
       pairs[pairs.length - 1].a += ` ${line.text}`;
+    } else if (line.text.trim().split(/\s+/).length >= 4) {
+      // Unprompted narration (a short "okay" or "hmm" is not worth a call).
+      pairs.push({ q: NARRATION, a: line.text });
+      answering = true;
     }
   }
   return pairs;
@@ -58,6 +69,38 @@ function mergeWorkflow(current: ObservedStep[], incoming: ObservedStep[]): Obser
   const seen = new Set(merged.map((s) => s.id));
   const kept = current.filter((s) => !seen.has(s.id));
   return kept.length ? [...merged, ...kept].sort(byTime) : merged;
+}
+
+/**
+ * One call at Stop: drop Torchbearer's own steps, steps never actually done, and exact duplicates.
+ * The merged step keeps the first step's id, time and screenshot, and every why and rule of the steps
+ * it replaces (those are the expert's words, so they are combined here, never rewritten by the model).
+ * If the call fails, the workflow is saved as written.
+ */
+async function tidyWorkflow(workflow: ObservedStep[], task: string, role: string): Promise<ObservedStep[]> {
+  if (workflow.length < 2) return workflow;
+  try {
+    const r = await fetch("/api/observe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: "tidy", task, role, workflow, qa: [], asked: [], now: elapsed() }),
+    });
+    const data = (await r.json()) as { steps?: { from: string[]; title: string; detail: string }[] };
+    if (!r.ok || !data.steps?.length) return workflow;
+    const byId = new Map(workflow.map((s) => [s.id, s]));
+    const join = (xs: (string | null)[]) => [...new Set(xs.filter((x): x is string => !!x?.trim()))].join(" ") || null;
+    // A dropped step's rule (e.g. "if the account doesn't match, email the supplier") belongs to the kept step before it.
+    const groups = data.steps.map((t) => ({ t, parts: t.from.map((id) => byId.get(id)!).filter(Boolean) }));
+    const owner = new Map(groups.flatMap((g, k) => g.t.from.map((id) => [id, k] as const)));
+    let last = 0;
+    for (const s of workflow) {
+      if (owner.has(s.id)) last = owner.get(s.id)!;
+      else if (s.rule || s.why) groups[last].parts.push({ ...s, title: "", detail: "" });
+    }
+    return groups.map(({ t, parts }) => ({ ...parts[0], title: t.title, detail: t.detail || parts[0].detail, why: join(parts.map((p) => p.why)), rule: join(parts.map((p) => p.rule)) }));
+  } catch {
+    return workflow;
+  }
 }
 
 export function useObserver(onWorkMapReady: (workflowId: string) => void) {
@@ -90,6 +133,7 @@ export function useObserver(onWorkMapReady: (workflowId: string) => void) {
   const actionsRef = useRef<{ time: string; text: string }[]>([]);
   const stepShots = useRef<Record<string, string>>({}); // screenshot kept for each observed step
   const workflowName = useRef("Untitled workflow");
+  const workflowRole = useRef(""); // the expert's role, e.g. "Accounts payable"
 
   // Write each new spoken answer into the workflow right away (fast, text-only call).
   useEffect(() => {
@@ -99,7 +143,7 @@ export function useObserver(onWorkMapReady: (workflowId: string) => void) {
     fetch("/api/observe", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode: "integrate", workflow: live.current.workflow, qa, asked: asked.current, now: elapsed() }),
+      body: JSON.stringify({ mode: "integrate", task: workflowName.current, role: workflowRole.current, workflow: live.current.workflow, qa, asked: asked.current, now: elapsed() }),
       signal: ctrl.signal,
     })
       .then((r) => r.json())
@@ -111,6 +155,19 @@ export function useObserver(onWorkMapReady: (workflowId: string) => void) {
       .catch(() => {});
     return () => ctrl.abort();
   }, [qa]);
+
+  /**
+   * The agent is mid-turn: it spoke in the last few seconds (its audio may still be playing), or the
+   * expert just finished talking and its reply is on the way. A tagged message sent now cuts that reply
+   * off and the agent starts a different question, which is the stutter heard in testing.
+   */
+  function agentBusy(now: number) {
+    const a = live.current.agent;
+    if (a.isSpeaking) return true;
+    if (now - a.lastAgentSpeech.current < 3000) return true;
+    const replyDue = a.lastUserSpeech.current > a.lastAgentSpeech.current && now - a.lastUserSpeech.current < 6000;
+    return replyDue;
+  }
 
   /** A new question is fine once the expert answered the last one (spoke after it) or went on working. */
   function answeredOrMovedOn(lastSpeech: number) {
@@ -135,7 +192,7 @@ export function useObserver(onWorkMapReady: (workflowId: string) => void) {
       const res = await fetch("/api/observe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ task: workflowName.current, frame: f.dataUrl, previous: lastSent.current, workflow: l.workflow, actions: actionsRef.current, qa: l.qa, asked: asked.current, now }),
+        body: JSON.stringify({ task: workflowName.current, role: workflowRole.current, frame: f.dataUrl, previous: lastSent.current, workflow: l.workflow, actions: actionsRef.current, qa: l.qa, asked: asked.current, now }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -170,7 +227,7 @@ export function useObserver(onWorkMapReady: (workflowId: string) => void) {
       const l = live.current;
       const q = pending.current;
       const now = Date.now();
-      if (!q || l.offRecord || l.agent.isSpeaking) return;
+      if (!q || l.offRecord || agentBusy(now)) return;
       if (now - watcher.current.lastChange < PAUSE_MS) return; // still working on screen
       if (now - l.agent.lastUserSpeech.current < 2500) return; // still talking
       if (!answeredOrMovedOn(l.agent.lastUserSpeech.current)) return; // don't stack questions
@@ -189,7 +246,7 @@ export function useObserver(onWorkMapReady: (workflowId: string) => void) {
     const t = setInterval(() => {
       const l = live.current;
       const now = Date.now();
-      if (pending.current || l.offRecord || l.agent.isSpeaking) return;
+      if (pending.current || l.offRecord || agentBusy(now)) return;
       if (idleAsked.current > Math.max(watcher.current.lastChange, l.agent.lastUserSpeech.current)) return; // already asked during this stop
       const quietSince = Math.max(watcher.current.lastChange, l.agent.lastUserSpeech.current, lastQuestionAt.current);
       if (now - quietSince < IDLE_MS || !answeredOrMovedOn(l.agent.lastUserSpeech.current)) return;
@@ -203,8 +260,17 @@ export function useObserver(onWorkMapReady: (workflowId: string) => void) {
     return () => clearInterval(t);
   }, [agent.connected, phase]);
 
-  async function start(name?: string) {
+  // Tell the voice agent who it is learning from, so its questions fit the role.
+  useEffect(() => {
+    if (!agent.connected) return;
+    const role = workflowRole.current;
+    agent.sendContextualUpdate(`[CONTEXT] The expert is teaching the workflow "${workflowName.current}"${role ? ` and works in ${role}` : ""}.`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per connection
+  }, [agent.connected]);
+
+  async function start(name?: string, role?: string) {
     workflowName.current = name?.trim() || `Workflow ${new Date().toLocaleString()}`;
+    workflowRole.current = role?.trim() ?? "";
     setError(null);
     resetSession();
     shots.current = {};
@@ -265,7 +331,8 @@ export function useObserver(onWorkMapReady: (workflowId: string) => void) {
     agent.endSession();
     watcher.current.stop();
     setSharing(false);
-    const steps = workflow.map((o, i) => ({
+    const tidy = await tidyWorkflow(workflow, workflowName.current, workflowRole.current);
+    const steps = tidy.map((o, i) => ({
       id: o.id || `s${i + 1}`,
       order: i + 1,
       title: o.title,
@@ -281,6 +348,7 @@ export function useObserver(onWorkMapReady: (workflowId: string) => void) {
     const saved = await saveWorkflow({
       id,
       name: workflowName.current,
+      ...(workflowRole.current ? { role: workflowRole.current } : {}),
       createdAt: new Date().toISOString(),
       map: { task: workflowName.current, steps, gaps: [], confirmed: qa.length > 0, offRecord: offRecordRanges, published: false },
     });

@@ -1,11 +1,14 @@
 "use client";
 // Module 2 · Mapping, for one saved workflow (?id=…):
-//   1. Check   every observation Torchbearer made (with its screenshot): ✓ correct / ✗ wrong + what really happened
-//   2. Review  Continue shows the CORRECTED workflow; every step can still be edited (revise)
-//   3. Save    approves it: the workflow is trained and Teaching can use it. Until then it is on hold.
+//   1. Check   every observation Torchbearer made (with its screenshot): ✓ correct / ✗ wrong + what really happened,
+//              rename a step, add notes, reorder, delete
+//   2. Save    applies the corrections and approves it (Teaching can use it; until then it is on hold),
+//              then opens the process map, which builds itself for the saved steps.
+//   A saved workflow opens on its saved steps; every step can still be edited there.
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import ExportDialog from "@/features/workmap/ExportDialog";
 import { TypeChip, guardrailType } from "@/features/workmap/WorkMapView";
 import NoAccess from "@/features/nav/NoAccess";
@@ -25,7 +28,24 @@ const readId = () => {
 const corrected = (s: WorkMapStep): WorkMapStep =>
   s.review === "wrong" && s.correction?.trim() ? { ...s, title: s.correction.trim(), decision: `Corrected by the expert (Torchbearer saw: ${s.title})` } : s;
 
+/**
+ * The process map details (tool, data, decision) were built from a step's old wording: when the title,
+ * reason or rules change, drop them so the process map rebuilds that step.
+ */
+function invalidate(next: WorkMapStep[], before: WorkMapStep[]): WorkMapStep[] {
+  const old = new Map(before.map((s) => [s.id, s]));
+  return next.map((s) => {
+    const o = old.get(s.id);
+    const same = o && o.title === s.title && o.reason === s.reason && o.guardrails.join(";") === s.guardrails.join(";");
+    if (same || !s.process) return s;
+    const { process: _drop, ...rest } = s;
+    void _drop;
+    return rest;
+  });
+}
+
 export default function MappingPage() {
+  const router = useRouter();
   const idParam = useSyncExternalStore(() => () => {}, readId, () => null);
   // Loaded from the database: the list of workflows, and the one being mapped.
   const [library, setLibrary] = useState<WorkflowSummary[]>([]);
@@ -73,6 +93,7 @@ export default function MappingPage() {
   const [exporting, setExporting] = useState(false);
   const [zoom, setZoom] = useState<WorkMapStep | null>(null);
   const [noteOpen, setNoteOpen] = useState<string | null>(null); // the step whose note box is open (check view)
+  const [titleOpen, setTitleOpen] = useState<string | null>(null); // the step whose title is being edited (check view)
   const [confirmDel, setConfirmDel] = useState<string | null>(null); // the step waiting for a second click on Delete
   const [me, setMe] = useState("");
   useEffect(() => {
@@ -107,10 +128,6 @@ export default function MappingPage() {
   }
   function setCorrection(id: string, text: string) {
     persist({ ...wf, map: { ...map, steps: map.steps.map((s) => (s.id === id ? { ...s, correction: text } : s)) } });
-  }
-  function toFinal() {
-    setDraft(map.steps.map(corrected));
-    setView("final");
   }
   function revise() {
     setEditing(null);
@@ -161,12 +178,22 @@ export default function MappingPage() {
       </button>
     </span>
   );
-  function save() {
-    const steps = finalSteps.filter((s) => s.title.trim()).map((s, i) => ({ ...s, order: i + 1, review: "ok" as const, correction: undefined }));
-    persist({ ...wf, map: { ...map, steps, published: true, confirmed: true } }, true);
+  /** Approve the steps (the corrected ones from the checks, or the edited saved ones), then show the process map. */
+  async function save() {
+    const from = showFinal ? finalSteps : map.steps.map(corrected);
+    const steps = invalidate(
+      from.filter((s) => s.title.trim()).map((s, i) => ({ ...s, order: i + 1, review: "ok" as const, correction: undefined })),
+      map.steps,
+    );
+    const next = { ...wf, map: { ...map, steps, published: true, confirmed: true } };
+    clearTimeout(saveTimer.current);
+    setRecord(next);
+    setSaveState("saving");
     setDraft(null);
     setEditing(null);
-    setView("final");
+    const ok = await saveWorkflow(next);
+    setSaveState(ok ? "saved" : "error");
+    if (ok) router.push(`/process?id=${encodeURIComponent(wf.id)}`);
   }
   function switchTo(id: string) {
     window.location.search = `?id=${id}`;
@@ -229,12 +256,13 @@ export default function MappingPage() {
                 )}
               </div>
               <h1 className="mt-4 text-[36px] font-light leading-[1.1] tracking-tight text-[#1f2d3d] md:text-[42px]">{wf.name}</h1>
+              {wf.role && <div className="mt-1 text-[15px] text-[#667085]">Role: <b className="font-medium text-[#344054]">{wf.role}</b></div>}
               <p className="mt-2 max-w-2xl text-[16px] leading-relaxed text-[#475467]">
                 {showFinal
                   ? approved && !draft
                     ? "The saved workflow Torchbearer teaches. Revise it any time."
                     : "This is the corrected workflow Torchbearer will learn. Edit any step, then save. Or go back and revise your checks."
-                  : "Step by step, everything Torchbearer saw while the expert worked. Mark each step correct, or tell it what really happened. Then continue to see the corrected workflow."}
+                  : "Step by step, everything Torchbearer saw while the expert worked. Mark each step correct, or tell it what really happened, rename or delete steps, then save."}
               </p>
             </div>
             <div className="flex flex-wrap gap-2 pt-1">
@@ -287,8 +315,11 @@ export default function MappingPage() {
                       <div className="flex items-start gap-3">
                         <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-brand text-[13px] font-bold text-white">{s.order}</span>
                         <div className="min-w-0 flex-1">
-                          {s.addedBy !== undefined ? (
+                          {s.addedBy !== undefined || titleOpen === s.id ? (
                             <input
+                              autoFocus={titleOpen === s.id}
+                              onBlur={() => titleOpen === s.id && setTitleOpen(null)}
+                              onKeyDown={(e) => e.key === "Enter" && titleOpen === s.id && setTitleOpen(null)}
                               value={s.title}
                               onChange={(e) => patchStep(s.id, { title: e.target.value })}
                               placeholder="What happens in this step?"
@@ -296,7 +327,14 @@ export default function MappingPage() {
                               className="h-10 w-full rounded-sm border border-[#9aa0a6] px-3 text-[16px] focus:border-indigo focus:outline-none"
                             />
                           ) : (
-                            <div className="text-[18px] leading-snug text-[#1f2d3d]">{s.title}</div>
+                            <div className="flex items-start gap-2">
+                              <div className="text-[18px] leading-snug text-[#1f2d3d]">{s.title}</div>
+                              {!isExample && (
+                                <button onClick={() => setTitleOpen(s.id)} className="mt-0.5 shrink-0 rounded-sm px-1.5 text-[13px] text-[#667085] hover:bg-indigo-soft hover:text-indigo" aria-label={`Rename step ${s.order}`} title="Rename this step">
+                                  ✎ Edit
+                                </button>
+                              )}
+                            </div>
                           )}
                           {s.decision && <div className="mt-0.5 text-[14px] text-[#667085]">Torchbearer saw: {s.decision}</div>}
                         </div>
@@ -346,7 +384,7 @@ export default function MappingPage() {
             </ol>
             {(map.offRecord ?? []).map((r) => (
               <p key={r.from} className="mt-4 rounded-md border border-dashed border-[#b9bdc4] bg-white px-4 py-2.5 text-[14px] text-[#555]">
-                <b>Off the record</b> {r.from}–{r.to}: The expert paused the recording here. Nothing was saved.
+                <b>Paused</b> {r.from}–{r.to}: The expert paused the recording here. Nothing was saved.
               </p>
             ))}
             <div className="mt-6 flex flex-wrap items-center justify-end gap-3">
@@ -356,8 +394,8 @@ export default function MappingPage() {
                 </button>
               )}
               <span className="text-[14px] text-[#667085]">{allChecked ? "All steps checked." : `${map.steps.length - checked} step(s) left to check.`}</span>
-              <button className="h-11 rounded-sm bg-indigo px-5 text-[15px] text-white hover:bg-indigo-dark disabled:opacity-40" onClick={toFinal} disabled={!allChecked}>
-                Continue → see the corrected workflow
+              <button className="h-11 rounded-sm bg-indigo px-5 text-[15px] text-white hover:bg-indigo-dark disabled:opacity-40" onClick={save} disabled={!allChecked || isExample || saveState === "saving"}>
+                ✓ Save workflow → process map
               </button>
             </div>
           </>
@@ -420,7 +458,7 @@ export default function MappingPage() {
                 </button>
                 {(draft || !approved) && (
                   <button className="h-11 rounded-sm bg-indigo px-5 text-[15px] text-white hover:bg-indigo-dark" onClick={save}>
-                    ✓ Save workflow
+                    ✓ Save workflow → process map
                   </button>
                 )}
               </div>

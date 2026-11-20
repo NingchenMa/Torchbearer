@@ -1,12 +1,17 @@
-// POST /api/observe — the screenshot-only Torchbearer's brain. Two modes:
+// POST /api/observe — the screenshot-only Torchbearer's brain. Three modes:
 //  "observe"   (screenshots) what the user just did, the updated workflow, and an optional
 //              question about something the screenshots alone cannot explain.
 //  "integrate" (text only, fast) write the expert's spoken answers into the workflow.
+//  "tidy"      (text only, once at Stop) drop steps about Torchbearer itself, steps that were never
+//              actually done, and exact duplicates; the level of detail stays as recorded.
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { geminiJson } from "@/lib/gemini";
 import { redact, redactDeep } from "@/lib/redact";
 import type { ObservedStep, ObserveQA } from "@/lib/types";
+
+// Marks what the expert said on their own, without a question (kept in step with useObserver.ts).
+const NARRATION = "(The expert explained this while working, without being asked.)";
 
 // Fast models first: one call per changed screen must take a couple of seconds, not tens.
 // Measured 2026-11-10 on real screenshots: 3.1 Flash Lite with minimal thinking answers in about 1.5-4 s and
@@ -31,7 +36,7 @@ Return JSON only:
 
 action: one sentence on what the expert did between PREVIOUS and CURRENT, with the specifics a colleague would need: which record or item, key values, and the NAMES of any documents attached or removed (e.g. "Saved record 4471 with two attachments: the receipt and an approval screenshot"). null if nothing meaningful changed (scrolling, mouse moves, typing in progress).
 
-workflow: the FULL workflow so far, in order. Keep every existing step, its id, why and rule. Add a step only for a new meaningful kind of action; when the expert repeats an earlier kind of action differently, add a step for the difference (e.g. "Attach the extra approval for this one"). Use NOW as time for new steps. Leave why and rule as they are; never invent them.
+workflow: the FULL workflow so far, in order. Keep every existing step, its id, why and rule. Add a step only for a new meaningful kind of action; when the expert repeats an earlier kind of action differently, add a step for the difference (e.g. "Attach the extra approval for this one"). Use NOW as time for new steps. Only write what you can see on the screen: never a step for something you didn't see (saving a file somewhere, an upload, a reply). why and rule come only from the expert's own words: always leave them as they are (null for a new step), never write them yourself.
 
 question: this is what makes you an apprentice, not a recorder. Ask when a new hire watching could NOT work out something important from the screen alone. Pointed, specific to what just happened, one thing at a time. Ask whenever something important is unclear or you lack context to explain this step to a new hire; there is no fixed number, and a typical task needs a question every step or two.
 Worth asking (best first):
@@ -50,20 +55,29 @@ Screenshots can be several seconds apart, so steps may have happened in between 
 
 Never include personal data (emails, phone, card or bank numbers).`;
 
-const INTEGRATE = `You keep an expert's workflow. The expert just answered questions out loud.
-Write each answer into the workflow step it is about:
+const INTEGRATE = `You keep an expert's workflow. The expert just spoke: answers to questions, or (marked "${NARRATION}") their own explanation while working.
+Write what they said into the workflow step it is about (usually the latest step, or the one whose subject they name):
 - "why": the reason, close to the expert's own words (one or two sentences).
-- "rule": any limit, exception or stop condition they state, as a short rule (e.g. "Over 30 per person: attach the supervisor's approval (date, amount, who was there)"). null if none.
-If an answer describes a rule that applies to a step not in the workflow yet, add that step with the answer's time.
+- "rule": any limit, exception or stop condition they state, as a short rule (e.g. "Over 5,000 USD: get an asset number from the finance manager"). null if none.
+Only use what the expert actually said. If they gave no reason for a step, leave its why as it is (null stays null); never write a reason yourself.
+What they WOULD do in another case ("if the account didn't match I'd email the supplier") is a rule on the step it belongs to, never a new step. Add a step only when they say they did something the workflow is missing.
 Keep all steps, ids, titles and times. Return JSON only: { "workflow": [ ${STEP_SHAPE} ] }`;
+
+const TIDY = `You clean up a workflow that was written live while an expert worked, before the expert checks it. Keep its level of detail: do not merge or reword steps except as below.
+1. Drop steps that are about Torchbearer itself (opening, launching or signing in to it, starting or stopping a recording, switching to or from it) and steps that only navigate (switching tabs, scrolling) with no work done.
+2. Drop a step that describes something the expert only said they would do in another case (e.g. "Handle mismatch: if the details don't match, email the supplier"); its rule is kept on the step before it for you.
+3. Merge only true duplicates: two steps that are the same check or action on the same thing (e.g. "Check purchase orders" right after "Verify the purchase order").
+Each output step lists in "from" the ids of the input steps it replaces, in order (a kept step lists only its own id). A dropped step appears in no "from". Never invent a step, a reason or a rule: why and rule are handled for you, so write only title and detail. Keep a kept step's title and detail as they are.
+Return JSON only: { "steps": [ { "from": [string], "title": string, "detail": string } ] }`;
 
 const toPart = (dataUrl: string) => ({
   inlineData: { mimeType: "image/jpeg", data: dataUrl.replace(/^data:image\/\w+;base64,/, "") },
 });
 
 interface Body {
-  mode?: "observe" | "integrate";
+  mode?: "observe" | "integrate" | "tidy";
   task?: string; // the workflow name the expert gave
+  role?: string; // the expert's role, e.g. "Accounts payable"
   frame?: string;
   previous?: string | null;
   workflow: ObservedStep[];
@@ -76,12 +90,15 @@ interface Body {
 // The model rewrites the whole workflow on every frame and sometimes leaves steps (or their
 // why/rule) out. Never lose what was already recorded: keep every earlier step in place, take the
 // model's update of it, keep an earlier why/rule it dropped, and add only genuinely new steps.
-function clean(steps: ObservedStep[] | undefined, prev: ObservedStep[]): ObservedStep[] {
+// why and rule are the expert's words: only the "integrate" call (which hears them) may write them.
+// The screen-reading call keeps what was there and leaves new steps without them, whatever the model returned.
+function clean(steps: ObservedStep[] | undefined, prev: ObservedStep[], fromSpeech = false): ObservedStep[] {
   const next = Array.isArray(steps) ? steps.filter((s) => s && typeof s.title === "string") : [];
   const byId = new Map(next.filter((s) => s.id).map((s) => [s.id, s]));
   const kept = prev.map((p) => {
     const n = byId.get(p.id);
-    return n ? { ...p, ...n, id: p.id, why: n.why ?? p.why ?? null, rule: n.rule ?? p.rule ?? null } : p;
+    if (!n) return p;
+    return fromSpeech ? { ...p, ...n, id: p.id, why: n.why ?? p.why ?? null, rule: n.rule ?? p.rule ?? null } : { ...p, ...n, id: p.id, why: p.why ?? null, rule: p.rule ?? null };
   });
   const ids = new Set(kept.map((s) => s.id));
   let k = kept.length;
@@ -90,7 +107,7 @@ function clean(steps: ObservedStep[] | undefined, prev: ObservedStep[]): Observe
     let id = s.id || `w${++k}`;
     while (ids.has(id)) id = `w${++k}`;
     ids.add(id);
-    kept.push({ ...s, id, why: s.why ?? null, rule: s.rule ?? null });
+    kept.push({ ...s, id, why: fromSpeech ? (s.why ?? null) : null, rule: fromSpeech ? (s.rule ?? null) : null });
   }
   return kept;
 }
@@ -101,15 +118,35 @@ export async function POST(req: Request) {
   const body = (await req.json()) as Body;
   const { workflow, qa, asked, now } = body;
 
+  const about = `TASK BEING TAUGHT: ${body.task || "(not named)"}${body.role ? `\nTHE EXPERT'S ROLE: ${body.role}` : ""}`;
+
+  if (body.mode === "tidy") {
+    if (workflow.length < 2) return NextResponse.json({ steps: workflow.map((s) => ({ from: [s.id], title: s.title, detail: s.detail })) });
+    const text = redact(`${about}\n\nWORKFLOW:\n${workflow.map((s) => `[${s.id}] ${s.time} ${s.title}: ${s.detail}${s.why ? ` | expert said why: ${s.why}` : ""}${s.rule ? ` | rule: ${s.rule}` : ""}`).join("\n")}`);
+    const r = await geminiJson<{ steps?: { from?: string[]; title?: string; detail?: string }[] }>(TIDY, [{ text }], MODELS);
+    if (!r.ok) return NextResponse.json({ error: r.error }, { status: 502 });
+    // Every id at most once, only ids that exist, order kept as the model gave it.
+    const ids = new Set(workflow.map((s) => s.id));
+    const byId = new Map(workflow.map((s) => [s.id, s]));
+    const used = new Set<string>();
+    const steps = (redactDeep(r.data).steps ?? [])
+      .map((x) => ({ from: (Array.isArray(x.from) ? x.from : []).filter((id) => ids.has(id) && !used.has(id) && used.add(id)), title: String(x.title ?? "").trim(), detail: String(x.detail ?? "").replace(/\s*\|[\s\S]*$/, "").trim() }))
+      .filter((x) => x.from.length && x.title)
+      // A step that was only kept keeps its own wording: the model is not to reword the expert's steps.
+      .map((x) => (x.from.length === 1 ? { ...x, title: byId.get(x.from[0])!.title, detail: byId.get(x.from[0])!.detail } : x));
+    if (!steps.length) return NextResponse.json({ error: "Empty tidy result" }, { status: 502 });
+    return NextResponse.json({ steps });
+  }
+
   if (body.mode === "integrate") {
-    const text = redact(`NOW: ${now}\n\nWORKFLOW:\n${JSON.stringify(workflow)}\n\nQUESTIONS AND THE EXPERT'S ANSWERS:\n${qa.map((x) => `Q: ${x.q}\nA: ${x.a}`).join("\n\n")}`);
+    const text = redact(`${about}\nNOW: ${now}\n\nWORKFLOW:\n${JSON.stringify(workflow)}\n\nQUESTIONS AND THE EXPERT'S ANSWERS:\n${qa.map((x) => `Q: ${x.q}\nA: ${x.a}`).join("\n\n")}`);
     const r = await geminiJson<{ workflow?: ObservedStep[] }>(INTEGRATE, [{ text }], MODELS);
     if (!r.ok) return NextResponse.json({ error: r.error }, { status: 502 });
-    return NextResponse.json({ workflow: clean(redactDeep(r.data).workflow, workflow) });
+    return NextResponse.json({ workflow: clean(redactDeep(r.data).workflow, workflow, true) });
   }
 
   const context = redact(
-    `TASK BEING TAUGHT: ${body.task || "(not named)"}\nNOW: ${now}\n\nACTION LOG:\n${(body.actions ?? []).map((a) => `${a.time} ${a.text}`).join("\n") || "(nothing yet)"}\n\nWORKFLOW SO FAR:\n${JSON.stringify(workflow)}\n\nALREADY ASKED (do not repeat):\n${asked.join("\n") || "(none)"}\n\nANSWERS SO FAR:\n${qa.map((x) => `Q: ${x.q}\nA: ${x.a}`).join("\n") || "(none)"}`,
+    `${about}\nNOW: ${now}\n\nACTION LOG:\n${(body.actions ?? []).map((a) => `${a.time} ${a.text}`).join("\n") || "(nothing yet)"}\n\nWORKFLOW SO FAR:\n${JSON.stringify(workflow)}\n\nALREADY ASKED (do not repeat):\n${asked.join("\n") || "(none)"}\n\nANSWERS SO FAR:\n${qa.map((x) => `Q: ${x.q}\nA: ${x.a}`).join("\n") || "(none)"}`,
   );
   const parts = [
     { text: context },

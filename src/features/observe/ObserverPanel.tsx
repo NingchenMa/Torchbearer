@@ -15,7 +15,7 @@ const STATUS: Record<ObserverStatus, string> = {
   watching: "Recording · asks when you pause",
   reading: "Reading the screen…",
   asking: "Asking…",
-  off_record: "Off the record",
+  off_record: "Paused",
   debrief: "Debrief · listening",
   building: "Saving the workflow…",
 };
@@ -23,8 +23,9 @@ const STATUS: Record<ObserverStatus, string> = {
 const btnOutline = "h-9 rounded-sm border border-indigo bg-white px-3 text-[14px] text-indigo hover:bg-indigo-soft disabled:opacity-50";
 const btnPrimary = "h-9 rounded-sm bg-indigo px-3 text-[14px] text-white hover:bg-indigo-dark disabled:opacity-50";
 
-export default function ObserverPanel({ o, onStart }: { o: Observer; onStart?: (workflowName: string) => void }) {
+export default function ObserverPanel({ o, onStart }: { o: Observer; onStart?: (workflowName: string, role: string) => void }) {
   const [name, setName] = useState("");
+  const [role, setRole] = useState("");
   const lastAgent = [...o.transcript].reverse().find((t) => t.speaker === "agent");
   const lastYou = [...o.transcript].reverse().find((t) => t.speaker === "expert");
   const tail = o.transcript.slice(-4);
@@ -35,7 +36,7 @@ export default function ObserverPanel({ o, onStart }: { o: Observer; onStart?: (
         <BotFace size={34} />
         <div className="min-w-0 flex-1 leading-tight">
           <div className="text-[17px] font-medium">Torchbearer</div>
-          <div className="truncate text-[12.5px] opacity-90">{o.offRecord ? "Paused by the expert" : "Learning from your screen"}</div>
+          <div className="truncate text-[12.5px] opacity-90">{o.offRecord ? "Recording paused" : "Learning from your screen"}</div>
         </div>
         <span className="rounded-sm border border-white/70 px-2 py-0.5 text-[11px] font-bold tracking-wide">
           {o.phase === "task" ? "LEARNING MODE" : "REVIEW MODE"}
@@ -52,9 +53,9 @@ export default function ObserverPanel({ o, onStart }: { o: Observer; onStart?: (
 
       {o.offRecord ? (
         <div className="px-5 py-8 text-center">
-          <div className="text-[12px] font-bold tracking-[.12em] text-[#666]">OFF THE RECORD</div>
+          <div className="text-[12px] font-bold tracking-[.12em] text-[#666]">PAUSED</div>
           <div className="my-1.5 text-[20px]">Nothing is being saved</div>
-          <p className="text-[14px] leading-relaxed text-[#555]">No screenshots, no voice, no questions. The Work Map will show a gap here.</p>
+          <p className="text-[14px] leading-relaxed text-[#555]">No screenshots, no voice, no questions until you resume. Use it for anything private.</p>
         </div>
       ) : (
         lastAgent && (
@@ -127,15 +128,23 @@ export default function ObserverPanel({ o, onStart }: { o: Observer; onStart?: (
                 id="wf-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Meal expense report"
+                placeholder="e.g. Paying a bill"
                 className="h-10 w-full rounded-sm border border-[#9aa0a6] px-3 text-[15px] focus:border-indigo focus:outline-none"
               />
-              <button className={`${btnPrimary} w-full`} onClick={() => onStart(name)} disabled={!name.trim()}>● Start recording</button>
+              <label className="text-[12px] font-bold uppercase tracking-[.12em] text-[#667085]" htmlFor="wf-role">Your role</label>
+              <input
+                id="wf-role"
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                placeholder="e.g. Accounts payable"
+                className="h-10 w-full rounded-sm border border-[#9aa0a6] px-3 text-[15px] focus:border-indigo focus:outline-none"
+              />
+              <button className={`${btnPrimary} w-full`} onClick={() => onStart(name, role)} disabled={!name.trim()}>● Start recording</button>
             </div>
           )
         ) : o.phase === "task" ? (
           <>
-            <button className={`${btnOutline} flex-1`} onClick={o.toggleOffRecord}>{o.offRecord ? "Back on the record" : "Off the record"}</button>
+            <button className={`${btnOutline} flex-1`} onClick={o.toggleOffRecord}>{o.offRecord ? "▶ Resume" : "❚❚ Pause"}</button>
             <button className={`${btnPrimary} flex-1`} onClick={o.endTask}>Stop recording</button>
           </>
         ) : (

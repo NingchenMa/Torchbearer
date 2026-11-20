@@ -12,8 +12,6 @@ import NoAccess from "@/features/nav/NoAccess";
 import { EXAMPLE_ID, getWorkflowAccess, listWorkflows, saveWorkflow } from "@/lib/session";
 import type { WorkflowRecord, WorkflowSummary, WorkMap, WorkMapStep } from "@/lib/types";
 import { ProcessCanvas } from "@/features/workmap/ProcessCanvas";
-import { ACTION_NAMES, OTHER_ACTION, actionColor, actionOf } from "@/features/workmap/actionCategory";
-import { Segmented } from "@/features/ui/fx";
 
 const readId = () => {
   try {
@@ -76,7 +74,6 @@ export default function ProcessMapPage() {
   const [building, setBuilding] = useState(false);
   const [zoom, setZoom] = useState<{ src: string; title: string } | null>(null);
   const [me, setMe] = useState<string | undefined>(undefined);
-  const [groupBy, setGroupBy] = useState<"tool" | "action">("tool");
   useEffect(() => {
     fetch("/api/auth/me")
       .then((r) => (r.ok ? r.json() : null))
@@ -95,6 +92,8 @@ export default function ProcessMapPage() {
         setDenied(refused);
         setRecord(loaded);
         setLoading(false);
+        // The map builds itself when steps have no tools and data yet (a new workflow, or steps edited on the Work Map).
+        if (loaded && loaded.id !== EXAMPLE_ID && loaded.map.steps.length && !loaded.map.steps.every((s) => s.process)) build(loaded);
       }
     });
     return () => {
@@ -117,12 +116,12 @@ export default function ProcessMapPage() {
     saveWorkflow(next).then((ok) => !ok && setError("Couldn't save the change to the process map. Please try again."));
   };
 
-  async function build() {
-    if (!record) return;
+  async function build(target: WorkflowRecord | null = record) {
+    if (!target) return;
     setBuilding(true);
     setError(null);
     try {
-      const r = await fetch("/api/processmap", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: record.id }) });
+      const r = await fetch("/api/processmap", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: target.id }) });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || `Error ${r.status}`);
       setRecord(data as WorkflowRecord);
@@ -153,15 +152,6 @@ export default function ProcessMapPage() {
   const total = timed.reduce((a, t) => a + (t.duration ?? 0), 0);
   const tools = [...new Set(steps.map((s) => s.process?.tool).filter((t): t is string => !!t))];
   const color = (tool?: string) => TOOL_COLORS[Math.max(0, tools.indexOf(tool ?? "")) % TOOL_COLORS.length];
-  // Grouped by action: one lane per kind of action, in the usual order of a task, Other last.
-  const byAction = groupBy === "action";
-  const actionLanes = [...ACTION_NAMES, OTHER_ACTION.name];
-  // Moving boxes while grouped by action keeps its own positions, so the tool view stays as it was.
-  const saveActionCanvas = (patch: Partial<WorkMap>) => {
-    if (!("layout" in patch)) return saveCanvas(patch);
-    const { layout, ...rest } = patch;
-    saveCanvas({ ...rest, layoutByAction: layout });
-  };
   const decisions = steps.filter((s) => s.process?.decision || s.guardrails.length).length;
   const questions = steps.reduce((a, s) => a + openQuestions(s).length, 0);
   const order = new Map(steps.map((s, i) => [s.id, i + 1]));
@@ -180,7 +170,7 @@ export default function ProcessMapPage() {
         <div className="mx-auto max-w-6xl px-4 pb-7 pt-5 sm:px-6">
           <div className="mb-4 flex flex-wrap items-center gap-3 text-[13.5px]">
             <Link href="/vault" className="text-[#667085] hover:text-indigo">← Workflows</Link>
-            {!record.map.published && <Link href={`/map?id=${encodeURIComponent(record.id)}`} className="text-[#667085] hover:text-indigo">Work Map</Link>}
+            {record.id !== EXAMPLE_ID && <Link href={`/map?id=${encodeURIComponent(record.id)}`} className="text-[#667085] hover:text-indigo">✎ Edit steps</Link>}
             <select
               value={record.id}
               onChange={(e) => (window.location.search = `?id=${e.target.value}`)}
@@ -193,20 +183,21 @@ export default function ProcessMapPage() {
           </div>
           <span className="rounded-sm border border-indigo/30 bg-indigo-soft px-2.5 py-1 text-[12px] font-bold uppercase tracking-wide text-indigo">Process map</span>
           <h1 className="mt-3 text-[30px] font-light leading-[1.1] tracking-tight text-[#1f2d3d] sm:text-[38px]">{record.name}</h1>
+          {record.role && <div className="mt-1 text-[15px] text-[#667085]">Role: <b className="font-medium text-[#344054]">{record.role}</b></div>}
           <p className="mt-2 max-w-2xl text-[15.5px] leading-relaxed text-[#475467]">
             How this work flows: how long each step took, which tool it happens in, what data it needs and where that comes from, and which steps it feeds.
           </p>
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            {record.id !== EXAMPLE_ID && (
-              <button onClick={build} disabled={building} className="h-11 rounded-sm bg-indigo px-5 text-[15px] text-white hover:bg-indigo-dark disabled:opacity-50">
-                {building ? "Building the process map…" : built ? "Rebuild process map" : "Build process map"}
-              </button>
-            )}
-            {record.map.processBuiltAt && !building && (
-              <span className="text-[13px] text-[#667085]">Built {new Date(record.map.processBuiltAt).toLocaleString()}</span>
-            )}
-            {error && <span className="text-[13.5px] text-err">{error}</span>}
-          </div>
+          {(building || error) && (
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              {building && <span className="text-[14px] text-[#475467]">Building the process map…</span>}
+              {error && (
+                <>
+                  <span className="text-[13.5px] text-err">{error}</span>
+                  <button onClick={() => build()} className="h-9 rounded-sm border border-indigo bg-white px-3 text-[14px] text-indigo hover:bg-indigo-soft">Try again</button>
+                </>
+              )}
+            </div>
+          )}
           <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
             {tiles.map(([n, label]) => (
               <div key={label} className="rounded-md border border-line bg-white/80 px-4 py-3">
@@ -220,38 +211,25 @@ export default function ProcessMapPage() {
 
       {/* The diagram gets the full screen width; the reading sections below keep the page width. */}
       <div className="mx-auto max-w-[1720px] px-4 pt-6 sm:px-6">
-        {!built && (
+        {!built && building && (
           <p className="mb-5 rounded-md border border-dashed border-[#b9bdc4] bg-white px-4 py-3 text-[14.5px] text-[#475467]">
-            Showing step times only. Press <b>Build process map</b> to add the tools, the data each step needs and produces, and how the steps connect.
+            Showing step times while the tools and data for each step are worked out…
           </p>
         )}
 
         {/* The whole process as a diagram: lanes per tool, rules as diamonds, durations on the arrows */}
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-[13px] font-bold uppercase tracking-[.12em] text-[#667085]">Process diagram</h2>
-          <div className="flex items-center gap-2 text-[13.5px] text-muted">
-            <span>Group steps by</span>
-            <Segmented
-              label="Group steps by"
-              value={groupBy}
-              onChange={setGroupBy}
-              options={[
-                { value: "tool", label: "Tool" },
-                { value: "action", label: "Action" },
-              ]}
-            />
-          </div>
         </div>
         <ProcessCanvas
-          key={groupBy}
           timed={timed}
-          map={byAction ? { ...record.map, layout: record.map.layoutByAction } : record.map}
-          onSave={!CANVAS_EDITING || record.id === EXAMPLE_ID ? undefined : byAction ? saveActionCanvas : saveCanvas}
+          map={record.map}
+          onSave={!CANVAS_EDITING || record.id === EXAMPLE_ID ? undefined : saveCanvas}
           me={me}
           tools={built ? tools : []}
-          lanes={byAction ? actionLanes : built && tools.length ? tools : ["All steps"]}
-          laneOf={(s) => (byAction ? actionLanes.indexOf(actionOf(s)) : built && tools.length ? Math.max(0, tools.indexOf(s.process?.tool ?? "")) : 0)}
-          color={(lane) => (byAction ? actionColor(lane) : built ? color(lane) : "#a4161a")}
+          lanes={built && tools.length ? tools : ["All steps"]}
+          laneOf={(s) => (built && tools.length ? Math.max(0, tools.indexOf(s.process?.tool ?? "")) : 0)}
+          color={(lane) => (built ? color(lane) : "#a4161a")}
           fmt={fmt}
         />
       </div>
@@ -293,7 +271,6 @@ export default function ProcessMapPage() {
                   </div>
                   <div className="mt-1.5 flex flex-wrap gap-1.5">
                     {p && <span className="inline-block rounded-sm px-2 py-0.5 text-[12px] font-medium text-white" style={{ background: color(p.tool) }}>{p.tool}</span>}
-                    <span className="inline-block rounded-sm border px-2 py-0.5 text-[12px] font-medium" style={{ color: actionColor(actionOf(s)), borderColor: actionColor(actionOf(s)) }}>{actionOf(s)}</span>
                   </div>
                   {(s.correction || s.decision) && (
                     <p className="mt-3 text-[15px] leading-relaxed text-[#344054]">
@@ -333,12 +310,12 @@ export default function ProcessMapPage() {
                       </Block>
                     </div>
                   ) : null}
-                  {p?.decision && (
+                  {p?.decision && !same(p.decision, s.reason) && (
                     <div className="mt-3 rounded-md bg-indigo-soft/60 px-3 py-2 text-[14px]">
                       <b className="text-indigo">Decision:</b> {p.decision}
                     </div>
                   )}
-                  {s.expertQuote && (
+                  {s.expertQuote && !same(s.expertQuote, s.reason) && (
                     <blockquote className="mt-3 border-l-2 border-amber pl-3 font-serif text-[15px] italic text-[#344054]">&ldquo;{s.expertQuote}&rdquo;</blockquote>
                   )}
                   {(record.map.notes ?? [])
@@ -357,7 +334,7 @@ export default function ProcessMapPage() {
                       <b className="text-[#6b5000]">Note:</b> {s.note}
                     </div>
                   )}
-                  {p?.summary && (
+                  {p?.summary && !same(p.summary, s.reason) && !same(p.summary, s.correction || s.decision) && (
                     <div className="mt-3 rounded-md bg-cream px-3 py-2 text-[14.5px] leading-relaxed text-[#344054]">
                       <b className="text-crimson">The expert&apos;s explanation:</b> {p.summary}
                     </div>
@@ -368,8 +345,6 @@ export default function ProcessMapPage() {
           })}
         </ol>
 
-        {/* Data lineage: each piece of data, where it's made and where it's used */}
-        {built && <DataFlow steps={steps} order={order} />}
       </div>
 
       {/* A step's screenshot, full size */}
@@ -413,33 +388,10 @@ function Block({ title, children }: { title: string; children: React.ReactNode }
   );
 }
 
-function DataFlow({ steps, order }: { steps: WorkMapStep[]; order: Map<string, number> }) {
-  // Each input row: the data, where it comes from, and the step that uses it.
-  const rows = steps.flatMap((s) => (s.process?.inputs ?? []).map((x) => ({ name: x.name, source: x.source, usedIn: order.get(s.id) ?? 0 })));
-  if (!rows.length) return null;
-  return (
-    <>
-      <h2 className="mb-3 mt-4 text-[13px] font-bold uppercase tracking-[.12em] text-[#667085]">Data flow</h2>
-      <div className="overflow-x-auto rounded-md border border-line bg-white">
-        <table className="w-full min-w-[480px] text-left text-[14px]">
-          <thead className="bg-[#f9fafb] text-[12px] uppercase tracking-wide text-[#667085]">
-            <tr>
-              <th className="px-4 py-2 font-bold">Data or document</th>
-              <th className="px-4 py-2 font-bold">Comes from</th>
-              <th className="px-4 py-2 font-bold">Used in</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r, i) => (
-              <tr key={i} className="border-t border-line">
-                <td className="px-4 py-2 text-[#1f2d3d]">{r.name}</td>
-                <td className={`px-4 py-2 ${r.source === "unknown" ? "text-[#b25e09]" : "text-[#475467]"}`}>{r.source}</td>
-                <td className="px-4 py-2 text-[#475467]">step {r.usedIn}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </>
-  );
+/** Two texts that say the same thing (the model often repeats the reason as the decision or summary). */
+function same(a?: string, b?: string): boolean {
+  const n = (t?: string) => (t ?? "").toLowerCase().replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ").trim();
+  const x = n(a);
+  const y = n(b);
+  return !!x && !!y && (x === y || x.includes(y) || y.includes(x));
 }
