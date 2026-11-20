@@ -19,6 +19,8 @@ export const dynamic = "force-dynamic";
 // input sources; gemini-3.8-flash, gemini-flash-latest and gemini-3.7-flash ran past 60 s, gemini-3.5/3.6-flash were out of quota.
 const MODELS = ["gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.8-flash"];
 const MAX_SHOTS = 6; // more images made Gemini too slow for the hosting time limit (~30 s)
+const CHUNK = 10; // steps per call when a workflow is long
+const CHUNK_SHOTS = 3; // screenshots per chunk
 
 const PROCESS = `You turn a recorded work process into a process map that a new hire and a manager can read.
 You get the expert's STEPS in order (title, what was seen on screen, the expert's reason, their rules) and, for some steps, the screenshot taken at that step.
@@ -61,18 +63,53 @@ export async function POST(req: Request) {
       )
       .join("\n"),
   );
-  // Spread the screenshots we send over the whole process.
-  const withShots = steps.filter((s) => s.screenshot?.startsWith("data:image"));
-  const every = Math.max(1, Math.ceil(withShots.length / MAX_SHOTS));
-  const shots = withShots.filter((_, i) => i % every === 0).slice(0, MAX_SHOTS);
-  const parts = [
-    { text: `TASK: ${record.name}${record.role ? `\nROLE OF THE PERSON WHO DOES IT: ${record.role}` : ""}\n\nSTEPS:\n${list}` },
-    ...shots.flatMap((s) => [{ text: `Screenshot of step [${s.id}]:` }, toPart(s.screenshot!)]),
-  ];
-
-  const r = await geminiJson<{ steps?: (StepProcess & { id: string })[] }>(PROCESS, parts, MODELS, undefined, 0.92);
-  if (!r.ok) return NextResponse.json({ error: r.error }, { status: 502 });
-  const byId = new Map((redactDeep(r.data).steps ?? []).map((p) => [p.id, p]));
+  // Long workflows are built in parallel chunks: one call for 28 steps took 25-33 s, past the hosting
+  // time limit (~30 s on Amplify), so big maps came back partly built or not at all. Each chunk sees the
+  // whole step list (for data links and tool names) but answers only for its own steps, with a few of
+  // its own screenshots.
+  const started = Date.now();
+  const head = `TASK: ${record.name}${record.role ? `\nROLE OF THE PERSON WHO DOES IT: ${record.role}` : ""}\n\nSTEPS:\n${list}`;
+  const shotsOf = (group: typeof steps, max: number) => {
+    const withShots = group.filter((s) => s.screenshot?.startsWith("data:image"));
+    const every = Math.max(1, Math.ceil(withShots.length / max));
+    return withShots.filter((_, i) => i % every === 0).slice(0, max);
+  };
+  type Built = StepProcess & { id: string };
+  const ask = async (group: typeof steps, whole: boolean, budget: number) => {
+    const only = whole ? "" : `\n\nReturn entries ONLY for these step ids: ${group.map((s) => s.id).join(", ")}. Use the same tool name for the same tool as the other steps would get.`;
+    const shots = shotsOf(group, whole ? MAX_SHOTS : CHUNK_SHOTS);
+    const parts = [{ text: head + only }, ...shots.flatMap((s) => [{ text: `Screenshot of step [${s.id}]:` }, toPart(s.screenshot!)])];
+    // A chunk normally answers in 4-6 s, but Gemini sometimes hangs: give each try about 9 s, then the next model.
+    return geminiJson<{ steps?: Built[] } | Built[]>(PROCESS, parts, MODELS, budget, whole ? 0.92 : 0.45);
+  };
+  // The model sometimes answers with the bare list instead of { steps: [...] }: accept both.
+  const stepsOf = (data: { steps?: Built[] } | Built[]): Built[] => {
+    const d = redactDeep(data);
+    return Array.isArray(d) ? d : Array.isArray(d?.steps) ? d.steps : [];
+  };
+  const chunks = steps.length <= CHUNK ? [steps] : Array.from({ length: Math.ceil(steps.length / CHUNK) }, (_, k) => steps.slice(k * CHUNK, (k + 1) * CHUNK));
+  const results = await Promise.all(chunks.map((c) => ask(c, chunks.length === 1, 20_000)));
+  const byId = new Map<string, Built>();
+  for (const r of results) if (r.ok) for (const p of stepsOf(r.data)) if (p?.id) byId.set(p.id, p);
+  if (!byId.size) {
+    const failed = results.find((r) => !r.ok);
+    return NextResponse.json({ error: failed && !failed.ok ? failed.error : "The model returned no steps" }, { status: 502 });
+  }
+  // A step the model left out (or a chunk that failed) gets one more try, if there is time left.
+  const missing = steps.filter((s) => !byId.has(s.id));
+  const left = 26_000 - (Date.now() - started);
+  if (missing.length && left > 6_000) {
+    const again = await ask(missing, false, left - 1_000);
+      if (again.ok) for (const p of stepsOf(again.data)) if (p?.id && missing.some((m) => m.id === p.id)) byId.set(p.id, p);
+  }
+  // The same tool named slightly differently by two chunks ("Gmail" / "gmail") is one lane.
+  const toolName = new Map<string, string>();
+  for (const p of byId.values()) {
+    const t = typeof p.tool === "string" ? p.tool.trim() : "";
+    const k = t.toLowerCase();
+    if (t && !toolName.has(k)) toolName.set(k, t);
+    if (t) p.tool = toolName.get(k)!;
+  }
   const ids = new Set(steps.map((s) => s.id));
   const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
   const strs = (v: unknown) => (Array.isArray(v) ? v.map(str).filter(Boolean) : []);
